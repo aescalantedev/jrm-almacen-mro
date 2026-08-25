@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, Bell, Sun, Moon } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@teispace/next-themes";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ export function AppTopbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 overflow-hidden ring-offset-background transition-all hover:ring-2 hover:ring-primary/20">
                 <Avatar className="h-9 w-9 border border-border/50">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold" suppressHydrationWarning>
                     {user?.nombre?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
@@ -81,8 +81,8 @@ export function AppTopbar() {
             <DropdownMenuContent className="w-56 mt-2 rounded-xl" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-semibold leading-none text-foreground">{user?.nombre || 'Usuario'}</p>
-                  <p className="text-xs leading-none text-muted-foreground capitalize">{user?.rol || 'contador'} - ALM MRO CHILCA</p>
+                  <p className="text-sm font-semibold leading-none text-foreground" suppressHydrationWarning>{user?.nombre || 'Usuario'}</p>
+                  <p className="text-xs leading-none text-muted-foreground capitalize" suppressHydrationWarning>{user?.rol || 'contador'} - ALM MRO CHILCA</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

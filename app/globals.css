@@ -154,3 +154,15 @@
   --sidebar-primary: oklch(0.627 0.194 149.214) !important;
   --sidebar-primary-foreground: oklch(0.985 0 0) !important;
 }
+
+/* --- SAFE AREA SUPPORT FOR MOBILE/ANDROID --- */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Fixed header spacer - ensures content doesn't hide behind fixed topbar */
+.fixed-header-spacer {
+  height: env(safe-area-inset-top, 0px);
+}

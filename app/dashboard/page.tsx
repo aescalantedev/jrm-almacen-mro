@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   Package, CheckCircle2, XCircle, AlertTriangle, Clock,
   Users, BarChart3, DollarSign, RefreshCw, Loader2, Database,
-  TrendingUp, PieChart as PieIcon, FileSpreadsheet
+  TrendingUp, PieChart as PieIcon, FileSpreadsheet, Target
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { IRAContent } from "./components/ira-content";
 
 interface DashboardStats {
   totalRegistros: number;
@@ -93,6 +94,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<"general" | "ira">("general");
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -150,7 +152,7 @@ export default function DashboardPage() {
     try {
       const link = document.createElement("a");
       link.href = "/api/inventario/export";
-      link.setAttribute("download", `Inventario_MRO_${new Date().toISOString().split("T")[0]}.xlsx`);
+      link.setAttribute("download", `Inventario_MRO_${new Date().toLocaleDateString("sv-SE")}.xlsx`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -245,6 +247,39 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="flex gap-1 bg-secondary/30 p-1 rounded-xl border border-border/40 w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab("general")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            activeTab === "general"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          }`}
+        >
+          <Package className="h-3.5 w-3.5" />
+          General
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("ira")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+            activeTab === "ira"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          }`}
+        >
+          <Target className="h-3.5 w-3.5" />
+          IRA
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "ira" ? (
+        <IRAContent />
+      ) : (
+        <>
       {/* KPI METRIC CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* SKUs Sistema */}
@@ -590,6 +625,8 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

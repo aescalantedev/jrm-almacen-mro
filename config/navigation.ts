@@ -36,6 +36,7 @@ export const navigationGroups: NavGroup[] = [
     label: "Operaciones",
     items: [
       { title: "Inventario", url: "/inventario", icon: ClipboardCheck },
+      { title: "Productos", url: "/productos", icon: Package },
       { title: "Sincronizar Stock", url: "/sync", icon: RefreshCw },
     ],
   },

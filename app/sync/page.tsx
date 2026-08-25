@@ -76,7 +76,8 @@ export default function SyncPage() {
       const data = await res.json();
       if (data.success) {
         if (showToast) {
-          toast.success(`Sincronización completada: ${data.registros} registros actualizados`);
+          const nuevos = data.nuevos ? `, ${data.nuevos} nuevos pendientes` : "";
+          toast.success(`Sincronización completada: ${data.registros} registros actualizados${nuevos}`);
         }
         loadSyncInfo();
       } else {
@@ -140,6 +141,7 @@ export default function SyncPage() {
                       ? new Date(lastSync.fecha).toLocaleString("es-PE", {
                           dateStyle: "medium",
                           timeStyle: "short",
+                          timeZone: "America/Lima",
                         })
                       : "Sin registros previos"}
                   </div>
@@ -249,7 +251,7 @@ export default function SyncPage() {
                         </Badge>
                       </div>
                       <span className="text-[11px] text-muted-foreground">
-                        {new Date(log.fecha).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(log.fecha).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "America/Lima" })}
                       </span>
                     </div>
 
@@ -265,7 +267,7 @@ export default function SyncPage() {
                     </div>
 
                     <div className="text-[10px] text-muted-foreground text-right">
-                      {new Date(log.fecha).toLocaleDateString("es-PE", { dateStyle: "medium" })}
+                      {new Date(log.fecha).toLocaleDateString("es-PE", { dateStyle: "medium", timeZone: "America/Lima" })}
                     </div>
                   </div>
                 ))}
@@ -287,7 +289,7 @@ export default function SyncPage() {
                     {logs.map((log) => (
                       <tr key={log.id} className="hover:bg-secondary/20 transition">
                         <td className="py-2.5 px-4 font-medium text-foreground whitespace-nowrap">
-                          {new Date(log.fecha).toLocaleString("es-PE")}
+                          {new Date(log.fecha).toLocaleString("es-PE", { timeZone: "America/Lima" })}
                         </td>
                         <td className="py-2.5 px-4 text-center">
                           <Badge variant="outline" className="text-[10px] uppercase font-mono">

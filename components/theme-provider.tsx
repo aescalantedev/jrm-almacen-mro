@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { ThemeProvider as NextThemesProvider } from "@teispace/next-themes"
 
 export function ThemeProvider({
   children,
@@ -11,8 +11,6 @@ export function ThemeProvider({
     <NextThemesProvider
       {...props}
       enableColorScheme={false}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      scriptProps={{ suppressHydrationWarning: true } as any}
     >
       {children}
     </NextThemesProvider>
