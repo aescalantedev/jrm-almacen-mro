@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Zap } from "lucide-react";
+import { ChevronRight, Warehouse } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -43,10 +43,10 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 flex flex-row items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3 group/logo shrink-0">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/20 transition-transform group-hover/logo:scale-105">
-            <Zap className="h-5 w-5 text-primary-foreground fill-primary-foreground/20 opacity-100" />
+            <Warehouse className="h-5 w-5 text-primary-foreground fill-primary-foreground/20 opacity-100" />
           </div>
           <span className="text-lg font-bold tracking-tight text-foreground opacity-100 group-data-[collapsible=icon]:hidden">
-            Strix UI
+            MRO Inventario
           </span>
         </Link>
       </SidebarHeader>

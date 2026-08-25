@@ -8,9 +8,11 @@ export function ThemeProvider({
   ...props
 }: React.ComponentProps<typeof NextThemesProvider>) {
   return (
-    <NextThemesProvider 
-      {...props} 
-      enableColorScheme={false} // Evita el conflicto de script tag en React 19
+    <NextThemesProvider
+      {...props}
+      enableColorScheme={false}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      scriptProps={{ suppressHydrationWarning: true } as any}
     >
       {children}
     </NextThemesProvider>

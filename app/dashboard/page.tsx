@@ -1,315 +1,594 @@
 "use client";
 
-import * as React from "react";
-import { 
-  ArrowDownRight, 
-  ArrowUpRight, 
-  Calendar, 
-  Download, 
-  MoreVertical, 
-  DollarSign,
-  Users,
-  TrendingUp,
-  Activity,
-  Filter,
-  BarChart3
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import {
+  Package, CheckCircle2, XCircle, AlertTriangle, Clock,
+  Users, BarChart3, DollarSign, RefreshCw, Loader2, Database,
+  TrendingUp, PieChart as PieIcon, FileSpreadsheet
 } from "lucide-react";
-import { 
-  Area, 
-  AreaChart, 
-  CartesianGrid, 
-  XAxis, 
-  YAxis, 
-  Pie,
-  PieChart,
-  Cell,
-  Label
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from "recharts";
-
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  ChartContainer, 
-  ChartTooltip, 
-  ChartTooltipContent 
-} from "@/components/ui/chart";
+import { Progress } from "@/components/ui/progress";
 
-import { 
-  kpiData, 
-  performanceData, 
-  recentTransactions, 
-  recentActivity 
-} from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
+interface DashboardStats {
+  totalRegistros: number;
+  totalAuditados: number;
+  totalOk: number;
+  totalFaltante: number;
+  totalSobrante: number;
+  totalStockSistema: number;
+  totalCantFisica: number;
+  totalValor: number;
+  totalValorSistema: number;
+  totalDiferenciaValor: number;
+  stockTotal: number;
+  porcentajeCompletado: number;
+}
 
-import { RecentTransactionsTable } from "@/components/dashboard/recent-transactions-table";
+interface FamiliaStats {
+  name: string;
+  total_items: number;
+  ok_count: number;
+  faltante_count: number;
+  sobrante_count: number;
+  cant_fisica: number;
+  stock_sistema: number;
+  valor_total: number;
+}
 
-const kpiIcons = [DollarSign, Users, TrendingUp, Activity];
+interface EstadoItem {
+  name: string;
+  value: number;
+  color: string;
+}
 
-// Datos locales para asegurar sincronización de color exacta
-const trafficChartData = [
-  { name: "direct", value: 400, label: "Direct", fill: "var(--color-direct)" },
-  { name: "social", value: 300, label: "Social", fill: "var(--color-social)" },
-  { name: "referral", value: 300, label: "Referral", fill: "var(--color-referral)" },
-  { name: "ads", value: 200, label: "Ads", fill: "var(--color-ads)" },
-];
+interface TopDifItem {
+  id: number;
+  producto: string;
+  descripcion: string;
+  stock_sistema: number;
+  cantidad_fisica: number;
+  dif: number;
+  s_dif: number;
+  observacion: string;
+  rack: string;
+  ubicacion_actual: string;
+  familia2: string;
+}
 
-const totalTraffic = trafficChartData.reduce((acc, curr) => acc + curr.value, 0);
+interface UsuarioStats {
+  nombre: string;
+  usuario: string;
+  registros: number;
+  auditados: number;
+}
+
+interface Registro {
+  id: number;
+  producto: string;
+  descripcion: string;
+  lote: string;
+  stock_sistema: number;
+  cantidad_fisica: number;
+  dif: number;
+  observacion: string;
+  usuario_nombre: string;
+  updated_at: string;
+}
 
 export default function DashboardPage() {
-  const [isMounted, setIsMounted] = React.useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [porFamilia, setPorFamilia] = useState<FamiliaStats[]>([]);
+  const [porEstado, setPorEstado] = useState<EstadoItem[]>([]);
+  const [topDiferencias, setTopDiferencias] = useState<TopDifItem[]>([]);
+  const [porUsuario, setPorUsuario] = useState<UsuarioStats[]>([]);
+  const [ultimos, setUltimos] = useState<Registro[]>([]);
+  const [lastSync, setLastSync] = useState<{ fecha: string; registros_sync: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
-  React.useEffect(() => {
-    setIsMounted(true);
+  const loadDashboard = useCallback(async () => {
+    try {
+      const raw = localStorage.getItem("mro_auth");
+      const token = raw ? JSON.parse(raw).token : "";
+      const [dashRes, syncRes] = await Promise.all([
+        fetch("/api/admin", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/sync", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const dashData = await dashRes.json();
+      const syncData = await syncRes.json();
+      setStats(dashData.stats);
+      setPorFamilia(dashData.porFamilia || []);
+      setPorEstado(dashData.porEstado || []);
+      setTopDiferencias(dashData.topDiferencias || []);
+      setPorUsuario(dashData.porUsuario || []);
+      setUltimos(dashData.ultimosRegistros || []);
+      setLastSync(syncData.lastSync || null);
+    } catch {
+      toast.error("Error al cargar dashboard");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  if (!isMounted) {
-    return <div className="w-full h-screen bg-background" />;
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const raw = localStorage.getItem("mro_auth");
+      const token = raw ? JSON.parse(raw).token : "";
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Sincronización completada: ${data.registros} registros`);
+        loadDashboard();
+      } else {
+        toast.error(`Error: ${data.error}`);
+      }
+    } catch {
+      toast.error("Error de conexión al sincronizar");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const link = document.createElement("a");
+      link.href = "/api/inventario/export";
+      link.setAttribute("download", `Inventario_MRO_${new Date().toISOString().split("T")[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Descargando archivo Excel (.xlsx)");
+    } catch {
+      toast.error("Error al exportar a Excel");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="animate-spin text-primary" size={36} />
+      </div>
+    );
   }
 
+  const getObsBadge = (obs: string) => {
+    switch (obs) {
+      case "OK":
+        return (
+          <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] gap-1">
+            <CheckCircle2 className="h-3 w-3" /> OK
+          </Badge>
+        );
+      case "FALTANTE":
+        return (
+          <Badge className="bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 text-[10px] gap-1">
+            <XCircle className="h-3 w-3" /> Faltante
+          </Badge>
+        );
+      case "SOBRANTE":
+        return (
+          <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-[10px] gap-1">
+            <AlertTriangle className="h-3 w-3" /> Sobrante
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="secondary" className="text-[10px] gap-1">
+            <Clock className="h-3 w-3" /> Pendiente
+          </Badge>
+        );
+    }
+  };
+
   return (
-    <div className="flex flex-col gap-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-1000">
-      
-      {/* SECTION A: CLEAN HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent uppercase tracking-tight">
-              Dashboard Overview
-            </h1>
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-bold uppercase tracking-[0.15em]">
-               <Calendar className="h-3 w-3" />
-               <span>Apr 17 — May 17, 2026</span>
-            </div>
-          </div>
-          
-          <Tabs defaultValue="overview" className="w-fit">
-            <TabsList className="bg-secondary/40 border border-border/50 rounded-xl h-10 p-1">
-              <TabsTrigger value="overview" className="rounded-lg px-4 text-xs font-bold uppercase tracking-tight">Overview</TabsTrigger>
-              <TabsTrigger value="analytics" className="rounded-lg px-4 text-xs font-bold uppercase tracking-tight">Analytics</TabsTrigger>
-              <TabsTrigger value="reports" className="rounded-lg px-4 text-xs font-bold uppercase tracking-tight">Reports</TabsTrigger>
-            </TabsList>
-          </Tabs>
+    <div className="w-full space-y-6">
+      {/* Header Banner & Global Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2">
+            <Package className="h-7 w-7 text-primary" />
+            Dashboard de Inventario
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Métricas ejecutivas y control de existencias en tiempo real (ALM MRO CHILCA)
+          </p>
         </div>
-        
-        <div className="flex items-center gap-3 pb-1">
-          <Button variant="outline" className="rounded-xl border-border/50 shadow-sm h-10 gap-2 text-[10px] font-black uppercase tracking-[0.1em] px-4">
-            <Filter className="h-3.5 w-3.5" />
-            Filters
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleExportExcel}
+            disabled={exporting}
+            className="h-10 text-xs font-bold gap-2 rounded-xl border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+          >
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4" />
+            )}
+            Exportar Excel (.xlsx)
           </Button>
-          <Button className="rounded-xl shadow-sm h-10 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-[10px] font-black uppercase tracking-[0.1em] px-5">
-            <Download className="h-3.5 w-3.5" />
-            Export
+
+          <Button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            className="h-10 text-xs font-bold gap-2 rounded-xl shadow-sm"
+          >
+            {syncing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {syncing ? "Sincronizando..." : "Sincronizar Stock"}
           </Button>
         </div>
       </div>
 
-      {/* SECTION B: KPI GRID */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {kpiData.map((kpi, index) => {
-          const Icon = kpiIcons[index];
-          return (
-            <Card key={kpi.title} className="border-border/40 shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl group relative overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                  {kpi.title}
-                </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground/60 group-hover:text-primary transition-colors" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-black tracking-tighter mb-1">{kpi.value}</div>
-                <div className="flex items-center gap-1.5">
-                  <span className={cn(
-                    "flex items-center text-[10px] font-black uppercase tracking-tighter",
-                    kpi.trend === "up" ? "text-emerald-500" : "text-rose-500"
-                  )}>
-                    {kpi.trend === "up" ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
-                    {kpi.trendValue}
-                  </span>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest opacity-50">
-                    vs last month
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* SECTION C: CENTRAL CHARTS */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-12">
-        <Card className="lg:col-span-8 border-border/40 shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-8">
-            <div className="space-y-1">
-              <CardTitle className="text-lg font-black uppercase tracking-tight">Performance Analysis</CardTitle>
-              <CardDescription className="text-xs font-bold uppercase tracking-tighter opacity-60">Revenue growth trajectory</CardDescription>
+      {/* KPI METRIC CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        {/* SKUs Sistema */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">SKUs Sistema</span>
+              <Package className="h-4 w-4 text-primary" />
             </div>
-            <Button variant="ghost" size="icon" className="rounded-full h-8 w-8"><MoreVertical className="h-4 w-4 text-muted-foreground" /></Button>
-          </CardHeader>
-          <CardContent className="px-2 sm:px-6 h-[400px]">
-            <ChartContainer 
-              config={{ sales: { label: "Sales", color: "var(--primary)" } }}
-              className="h-full w-full"
-            >
-              <AreaChart data={performanceData} margin={{ left: 12, right: 12, top: 12 }}>
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted/20" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={12} className="text-[10px] font-black text-muted-foreground/50 uppercase tracking-widest" />
-                <YAxis tickLine={false} axisLine={false} tickMargin={12} className="text-[10px] font-black text-muted-foreground/50 uppercase" tickFormatter={(value) => `$${value}`} />
-                <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
-                <Area type="monotone" dataKey="sales" stroke="var(--primary)" fillOpacity={1} fill="url(#colorSales)" strokeWidth={3} dot={{ r: 4, fill: "var(--primary)", strokeWidth: 2, stroke: "var(--background)" }} activeDot={{ r: 6, strokeWidth: 0 }} />
-              </AreaChart>
-            </ChartContainer>
+            <div className="text-xl sm:text-2xl font-black font-mono">
+              {(stats?.stockTotal || 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-muted-foreground">Catálogo Flexline</div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-4 border-border/40 shadow-sm rounded-2xl overflow-hidden flex flex-col">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-black uppercase tracking-tight">Traffic Sources</CardTitle>
-            <CardDescription className="text-xs font-bold uppercase tracking-tighter opacity-60">Acquisition channels</CardDescription>
+        {/* Auditados */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Auditados</span>
+              <BarChart3 className="h-4 w-4 text-indigo-500" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-indigo-600 dark:text-indigo-400">
+              {(stats?.totalAuditados || 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-muted-foreground font-semibold">
+              {stats?.porcentajeCompletado || 0}% del total
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Conteo OK */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Exactos (OK)</span>
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400">
+              {(stats?.totalOk || 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-emerald-600/80 font-medium">Sin discrepancia</div>
+          </CardContent>
+        </Card>
+
+        {/* Faltantes */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Faltantes</span>
+              <XCircle className="h-4 w-4 text-rose-500" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-rose-600 dark:text-rose-400">
+              {(stats?.totalFaltante || 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-rose-600/80 font-medium">Requiere ajuste</div>
+          </CardContent>
+        </Card>
+
+        {/* Sobrantes */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Sobrantes</span>
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-amber-600 dark:text-amber-400">
+              {(stats?.totalSobrante || 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-amber-600/80 font-medium">Exceso físico</div>
+          </CardContent>
+        </Card>
+
+        {/* Valor Total Físico */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Valor Físico</span>
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+            </div>
+            <div className="text-base sm:text-lg font-black font-mono text-emerald-700 dark:text-emerald-400 truncate">
+              S/ {(stats?.totalValor || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[10px] text-muted-foreground">Valorizado actual</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Progress Bar Strip */}
+      <Card className="border-border/60 shadow-xs">
+        <CardContent className="p-4 sm:p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Avance Global del Inventario Físico
+            </span>
+            <span className="text-primary font-mono text-sm">{stats?.porcentajeCompletado || 0}%</span>
+          </div>
+          <Progress value={stats?.porcentajeCompletado || 0} className="h-3 rounded-full" />
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1 font-mono">
+            <span>{stats?.totalAuditados || 0} productos contados</span>
+            <span>{stats?.totalRegistros || 0} total en almacén</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* CHARTS GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* CHART 1: INVENTORY BY FAMILIA2 (BAR CHART - 2 COLS) */}
+        <Card className="lg:col-span-2 border-border/60 shadow-xs">
+          <CardHeader className="p-4 pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  Existencias por Familia 2 (Físico vs Sistema)
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Comparativa de unidades físicas registradas vs stock teórico
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-between pt-4">
-            <ChartContainer 
-              config={{
-                direct: { label: "Direct", color: "var(--chart-1)" },
-                social: { label: "Social", color: "var(--chart-2)" },
-                referral: { label: "Referral", color: "var(--chart-3)" },
-                ads: { label: "Ads", color: "var(--chart-4)" },
-              }}
-              className="h-[280px] w-full"
-            >
-              <PieChart>
-                <Pie
-                  data={trafficChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={65}
-                  outerRadius={85}
-                  paddingAngle={8}
-                  dataKey="value"
-                  nameKey="name"
+          <CardContent className="p-2 sm:p-4">
+            <div className="h-[280px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={porFamilia}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 25 }}
                 >
-                  {trafficChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} stroke="transparent" />
-                  ))}
-                  <Label
-                    content={({ viewBox }) => {
-                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                        return (
-                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                            <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-3xl font-black tracking-tighter">
-                              {totalTraffic.toLocaleString()}
-                            </tspan>
-                            <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 22} className="fill-muted-foreground text-[9px] font-black uppercase tracking-[0.2em] opacity-60">
-                              Sessions
-                            </tspan>
-                          </text>
-                        );
-                      }
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 10 }}
+                    angle={-25}
+                    textAnchor="end"
+                    interval={0}
+                    height={45}
+                  />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      borderColor: "hsl(var(--border))",
+                      borderRadius: "0.75rem",
+                      fontSize: "11px",
+                      color: "hsl(var(--popover-foreground))",
+                    }}
+                    formatter={(value: any, name: any) => [
+                      `${Number(value).toLocaleString()} und`,
+                      name === "cant_fisica" ? "Cant. Física" : "Stock Sistema",
+                    ]}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
+                    formatter={(val) => (val === "cant_fisica" ? "Físico Contado" : "Stock Sistema")}
+                  />
+                  <Bar dataKey="stock_sistema" fill="#94A3B8" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="cant_fisica" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CHART 2: AUDIT STATUS DONUT CHART (1 COL) */}
+        <Card className="border-border/60 shadow-xs">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
+              <PieIcon className="h-4 w-4 text-primary" />
+              Estado de Conteos
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Proporción de concordancia física
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-2 sm:p-4">
+            <div className="h-[280px] w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={porEstado}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {porEstado.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      borderColor: "hsl(var(--border))",
+                      borderRadius: "0.75rem",
+                      fontSize: "11px",
+                      color: "hsl(var(--popover-foreground))",
                     }}
                   />
-                </Pie>
-                <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-              </PieChart>
-            </ChartContainer>
-
-            <div className="space-y-4 mt-6">
-               {trafficChartData.map((item) => {
-                 const percentage = Math.round((item.value / totalTraffic) * 100);
-                 return (
-                   <div key={item.name} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider">
-                        <div className="flex items-center gap-2">
-                           <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.fill }} />
-                           <span className="text-foreground opacity-80">{item.label}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <span className="text-foreground">{item.value}</span>
-                           <span className="text-muted-foreground opacity-30">{percentage}%</span>
-                        </div>
-                      </div>
-                      <div className="h-1 w-full bg-secondary/50 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-1000" 
-                          style={{ backgroundColor: item.fill, width: `${percentage}%` }} 
-                        />
-                      </div>
-                   </div>
-                 );
-               })}
+                  <Legend
+                    wrapperStyle={{ fontSize: "11px" }}
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    align="center"
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* SECTION D: DATA TABLE & ACTIVITY */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        <Card className="lg:col-span-7 border-border/40 shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-6">
-            <div className="space-y-1">
-              <CardTitle className="text-lg font-black uppercase tracking-tight">Recent Transactions</CardTitle>
-              <CardDescription className="text-xs font-bold uppercase tracking-tighter opacity-60">Financial activity</CardDescription>
+      {/* TOP DISCREPANCIES TABLE & AUDITOR PERFORMANCE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* TOP DISCREPANCIES (2 COLS) */}
+        <Card className="lg:col-span-2 border-border/60 shadow-xs">
+          <CardHeader className="p-4 pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Principales Discrepancias Detectadas
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  SKUs con mayor variación entre cantidad física y stock de sistema
+                </CardDescription>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <RecentTransactionsTable data={recentTransactions as any} />
+          <CardContent className="p-0">
+            <div className="overflow-x-auto max-h-[360px]">
+              <table className="w-full text-xs">
+                <thead className="bg-secondary/40 border-b border-border/40 sticky top-0 z-10 backdrop-blur-sm">
+                  <tr>
+                    <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">SKU</th>
+                    <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">Descripción</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Sis.</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Fís.</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">DIF</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Ubicación</th>
+                    <th className="text-center py-2.5 px-3 font-bold text-muted-foreground uppercase">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {topDiferencias.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                        No se han registrado discrepancias. Todo el inventario coincide.
+                      </td>
+                    </tr>
+                  ) : (
+                    topDiferencias.map((item) => (
+                      <tr key={item.id} className="hover:bg-secondary/20 transition">
+                        <td className="py-2 px-3 font-mono font-bold">{item.producto}</td>
+                        <td className="py-2 px-3 max-w-[180px] truncate font-medium" title={item.descripcion}>
+                          {item.descripcion}
+                        </td>
+                        <td className="py-2 px-2 text-center font-mono">{item.stock_sistema}</td>
+                        <td className="py-2 px-2 text-center font-mono font-bold text-primary">{item.cantidad_fisica}</td>
+                        <td className="py-2 px-2 text-center font-mono font-bold">
+                          <span
+                            className={`px-1.5 py-0.5 rounded ${
+                              item.dif > 0
+                                ? "text-amber-600 bg-amber-500/10"
+                                : "text-rose-600 bg-rose-500/10"
+                            }`}
+                          >
+                            {item.dif > 0 ? `+${item.dif}` : item.dif}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 text-center text-[10px] font-mono text-muted-foreground">
+                          {item.rack ? `R:${item.rack} ` : ""}{item.ubicacion_actual || "-"}
+                        </td>
+                        <td className="py-2 px-3 text-center">{getObsBadge(item.observacion)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-5 border-border/40 shadow-sm rounded-2xl overflow-hidden flex flex-col">
-          <CardHeader>
-            <CardTitle className="text-lg font-black uppercase tracking-tight">System Activity</CardTitle>
-            <CardDescription className="text-xs font-bold uppercase tracking-tighter opacity-60">Engagement feed</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 flex-1">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-4 group cursor-default">
-                <Avatar className="h-10 w-10 border border-border/50 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
-                  <AvatarImage src={activity.avatar} />
-                  <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-black">{activity.user.substring(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs leading-none font-black uppercase tracking-tight">
-                      <span className="text-foreground">{activity.user}</span>{" "}
-                      <span className="text-muted-foreground font-bold opacity-40 lowercase tracking-normal">{activity.action}</span>
-                    </p>
-                    <span className="text-[9px] text-muted-foreground font-black uppercase tracking-tighter opacity-30">{activity.time}</span>
-                  </div>
-                  <p className="text-[11px] text-primary font-bold uppercase tracking-tight">{activity.item}</p>
+        {/* AUDITORS & LAST SYNC INFO (1 COL) */}
+        <div className="space-y-4">
+          {/* Auditors Card */}
+          <Card className="border-border/60 shadow-xs">
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm font-bold flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary" />
+                Auditoría por Contador
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Rendimiento de los operadores
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 space-y-2.5">
+              {porUsuario.length === 0 ? (
+                <div className="text-center py-6 text-xs text-muted-foreground">
+                  Sin registros de auditores
                 </div>
+              ) : (
+                porUsuario.map((u) => (
+                  <div
+                    key={u.usuario}
+                    className="flex items-center justify-between p-2.5 bg-secondary/30 rounded-xl border border-border/40"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-foreground">{u.nombre}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">@{u.usuario}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-mono font-bold text-primary">
+                        {u.auditados} / {u.registros}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">contados</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sync Status Card */}
+          <Card className="border-border/60 shadow-xs">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Database className="h-5 w-5" />
               </div>
-            ))}
-            
-            <div className="mt-auto pt-6 border-t border-border/50">
-               <div className="p-5 rounded-2xl bg-secondary/30 border border-border/40 relative overflow-hidden group">
-                 <div className="relative z-10 space-y-3">
-                   <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-60">Server Health</span>
-                      <span className="text-[9px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">OPTIMAL</span>
-                   </div>
-                   <div className="w-full bg-secondary h-1 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-full w-[99.9%] shadow-[0_0_15px_rgba(16,185,129,0.4)]" />
-                   </div>
-                 </div>
-               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="space-y-0.5">
+                <p className="text-xs font-bold text-foreground">Sincronización Flexline</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {lastSync
+                    ? `${new Date(lastSync.fecha).toLocaleString("es-PE")} (${lastSync.registros_sync} SKUs)`
+                    : "Base de datos local actualizada"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
