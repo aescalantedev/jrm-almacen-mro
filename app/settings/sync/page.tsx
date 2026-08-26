@@ -28,7 +28,10 @@ interface SyncLogEntry {
   detalle: string;
 }
 
+import { useAuth } from "../../inventario/hooks/use-auth";
+
 export default function SyncPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [syncing, setSyncing] = useState(false);
   const [logs, setLogs] = useState<SyncLogEntry[]>([]);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
@@ -93,6 +96,19 @@ export default function SyncPage() {
       setSyncing(false);
     }
   };
+
+
+  if (!user) return null;
+
+  if (user.rol !== "admin") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <XCircle className="h-12 w-12 text-rose-500" />
+        <h2 className="text-xl font-bold">Acceso Denegado</h2>
+        <p className="text-muted-foreground text-sm">No tienes permisos para sincronizar el stock. Se requiere rol de administrador.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-6">

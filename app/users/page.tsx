@@ -2,15 +2,12 @@
 
 import * as React from "react";
 import { 
-  Plus, 
   Search, 
-  UserCog, 
   UserMinus, 
   ChevronLeft, 
   ChevronRight,
-  Shield,
-  MoreVertical,
-  Filter
+  Filter,
+  AlertTriangle
 } from "lucide-react";
 
 import { 
@@ -23,28 +20,67 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { users } from "@/lib/mock-users";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+
+import { useAuth } from "../inventario/hooks/use-auth";
+import { toast } from "sonner";
 
 export default function UserListPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [selectedUsers, setSelectedUsers] = React.useState<string[]>([]);
+  const [selectedUsers, setSelectedUsers] = React.useState<number[]>([]);
+  const [users, setUsers] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  const { user, token } = useAuth();
+
+  const loadUsers = React.useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/users', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.users) {
+        setUsers(data.users);
+      }
+    } catch (e) {
+      toast.error("Error al cargar usuarios");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  React.useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  if (!user) return null;
+
+  if (user.rol !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <AlertTriangle className="h-12 w-12 text-rose-500" />
+        <h2 className="text-xl font-bold">Acceso Denegado</h2>
+        <p className="text-muted-foreground">No tienes permisos para ver usuarios.</p>
+        <Button onClick={() => window.location.href = '/inventario'}>Ir a Inventario</Button>
+      </div>
+    );
+  }
 
   // Filtrado de usuarios
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = users.filter(u => 
+    u.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.usuario.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Lógica de Selección Masiva
@@ -58,7 +94,49 @@ export default function UserListPage() {
     }
   };
 
-  const toggleSelectUser = (userId: string) => {
+  const deleteUser = async (id: number) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/users?id=${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success("Usuario suspendido");
+        loadUsers();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || "Error al suspender");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    }
+  };
+
+  const updateUserField = async (id: number, updates: any) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/users`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ id, ...updates })
+      });
+      if (res.ok) {
+        toast.success("Usuario actualizado");
+        loadUsers();
+      } else {
+        const d = await res.json();
+        toast.error(d.error || "Error al actualizar");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    }
+  };
+
+  const toggleSelectUser = (userId: number) => {
     setSelectedUsers(prev => 
       prev.includes(userId) 
         ? prev.filter(id => id !== userId) 
@@ -91,7 +169,6 @@ export default function UserListPage() {
             />
           </div>
           
-          {/* Botón de acción masiva condicional */}
           {selectedUsers.length > 0 && (
             <Button variant="destructive" className="rounded-xl h-10 px-4 animate-in zoom-in-95 duration-200 font-bold text-xs">
                Delete ({selectedUsers.length})
@@ -101,10 +178,6 @@ export default function UserListPage() {
           <Button variant="outline" className="rounded-xl border-border/50 h-10 gap-2 text-[10px] font-black uppercase tracking-widest px-4">
              <Filter className="h-3.5 w-3.5" />
              Filters
-          </Button>
-          <Button className="rounded-xl shadow-sm h-10 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-[10px] font-black uppercase tracking-[0.1em] px-5 transition-all active:scale-95 shrink-0">
-            <Plus className="h-4 w-4" />
-            Add New User
           </Button>
         </div>
       </div>
@@ -124,88 +197,83 @@ export default function UserListPage() {
               <TableHead className="font-black text-[10px] uppercase tracking-widest py-4">User</TableHead>
               <TableHead className="font-black text-[10px] uppercase tracking-widest">Role</TableHead>
               <TableHead className="font-black text-[10px] uppercase tracking-widest">Status</TableHead>
-              <TableHead className="font-black text-[10px] uppercase tracking-widest">Last Login</TableHead>
+              <TableHead className="font-black text-[10px] uppercase tracking-widest">Created At</TableHead>
               <TableHead className="text-right px-6"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((u) => (
               <TableRow 
-                key={user.id} 
+                key={u.id} 
                 className={cn(
                   "hover:bg-muted/50 transition-colors border-border/30 group",
-                  selectedUsers.includes(user.id) && "bg-primary/5 hover:bg-primary/10"
+                  selectedUsers.includes(u.id) && "bg-primary/5 hover:bg-primary/10"
                 )}
               >
                 <TableCell className="px-6">
                    <Checkbox 
-                     checked={selectedUsers.includes(user.id)}
-                     onCheckedChange={() => toggleSelectUser(user.id)}
+                     checked={selectedUsers.includes(u.id)}
+                     onCheckedChange={() => toggleSelectUser(u.id)}
                      className="rounded-sm border-muted-foreground/30" 
                    />
                 </TableCell>
                 <TableCell className="py-4">
                   <div className="flex items-center gap-4">
                     <Avatar className="h-10 w-10 border border-border/50 ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
-                      <AvatarImage src={user.avatar} />
+                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${u.nombre}`} />
                       <AvatarFallback className="bg-primary/5 text-primary text-xs font-black">
-                        {user.name.substring(0, 2).toUpperCase()}
+                        {u.nombre.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                      <span className="font-black text-sm tracking-tight">{user.name}</span>
-                      <span className="text-[11px] text-muted-foreground font-medium">{user.email}</span>
+                      <span className="font-black text-sm tracking-tight">{u.nombre}</span>
+                      <span className="text-[11px] text-muted-foreground font-medium">{u.usuario}</span>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge className={cn(
-                    "rounded-lg px-2.5 py-0.5 text-[9px] font-black uppercase tracking-tighter border-none shadow-none",
-                    user.role === "Admin" && "bg-primary/10 text-primary",
-                    user.role === "Editor" && "bg-blue-500/10 text-blue-600",
-                    user.role === "Viewer" && "bg-slate-500/10 text-slate-600 dark:text-slate-400"
-                  )}>
-                    {user.role}
-                  </Badge>
+                  <Select value={u.rol} onValueChange={(val) => updateUserField(u.id, { rol: val })}>
+                    <SelectTrigger className={cn(
+                      "h-6 rounded-lg px-2 text-[10px] font-black uppercase tracking-tighter border-none shadow-none focus:ring-0",
+                      u.rol === "admin" && "bg-primary/10 text-primary",
+                      u.rol === "auditor" && "bg-blue-500/10 text-blue-600",
+                      u.rol === "almacenero" && "bg-emerald-500/10 text-emerald-600",
+                      u.rol === "contador" && "bg-slate-500/10 text-slate-600 dark:text-slate-400"
+                    )}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-border/50 shadow-xl rounded-xl z-[100]">
+                      <SelectItem value="admin" className="text-xs font-bold rounded-lg cursor-pointer">Admin</SelectItem>
+                      <SelectItem value="auditor" className="text-xs font-bold rounded-lg cursor-pointer">Auditor</SelectItem>
+                      <SelectItem value="almacenero" className="text-xs font-bold rounded-lg cursor-pointer">Almacenero</SelectItem>
+                      <SelectItem value="contador" className="text-xs font-bold rounded-lg cursor-pointer">Contador</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <div className={cn(
-                      "h-1.5 w-1.5 rounded-full",
-                      user.status === "Active" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-muted-foreground/30"
-                    )} />
+                    <Switch 
+                      checked={u.activo === 1}
+                      onCheckedChange={(val) => updateUserField(u.id, { activo: val ? 1 : 0 })}
+                      className="data-[state=checked]:bg-emerald-500 h-5 w-9 scale-75"
+                    />
                     <span className={cn(
                       "text-[10px] font-bold uppercase tracking-wider",
-                      user.status === "Active" ? "text-foreground" : "text-muted-foreground"
+                      u.activo === 1 ? "text-foreground" : "text-muted-foreground"
                     )}>
-                      {user.status}
+                      {u.activo === 1 ? "Active" : "Inactive"}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <span className="text-[11px] font-bold text-muted-foreground uppercase opacity-70 tracking-tight">
-                    {user.lastLogin}
+                    {new Date(u.created_at).toLocaleDateString()}
                   </span>
                 </TableCell>
                 <TableCell className="text-right px-6">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-xl min-w-[160px] p-2 z-[100] shadow-xl border-border/50">
-                      <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 pb-2">User Actions</DropdownMenuLabel>
-                      <DropdownMenuItem className="rounded-lg cursor-pointer gap-2 py-2">
-                        <UserCog className="h-3.5 w-3.5" />
-                        <span className="text-xs font-bold">Edit Profile</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="rounded-lg cursor-pointer gap-2 py-2 text-rose-500 focus:text-rose-500 focus:bg-rose-50/10">
-                        <UserMinus className="h-3.5 w-3.5" />
-                        <span className="text-xs font-bold">Suspend User</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 rounded-full" onClick={() => deleteUser(u.id)}>
+                    <UserMinus className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -230,13 +298,12 @@ export default function UserListPage() {
           </Button>
           <div className="flex items-center gap-1 mx-2">
              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-black shadow-sm">1</div>
-             <div className="h-8 w-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center text-[10px] font-black transition-colors cursor-pointer text-muted-foreground">2</div>
-             <div className="h-8 w-8 rounded-lg hover:bg-secondary/50 flex items-center justify-center text-[10px] font-black transition-colors cursor-pointer text-muted-foreground">3</div>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
-            className="rounded-xl border-border/50 h-9 px-4 gap-1 text-[10px] font-black uppercase tracking-widest"
+            className="rounded-xl border-border/50 h-9 px-4 gap-1 text-[10px] font-black uppercase tracking-widest disabled:opacity-30"
+            disabled
           >
             Next
             <ChevronRight className="h-3 w-3" />

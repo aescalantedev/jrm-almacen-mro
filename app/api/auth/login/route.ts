@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     if (!comparePassword(password, user.password_hash)) {
       return NextResponse.json({ error: 'Contrasena incorrecta' }, { status: 401 });
     }
-    const token = generateToken({ id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol as 'contador' | 'admin' });
+    const token = generateToken({ id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol as 'contador' | 'admin' | 'almacenero' | 'auditor' });
     return NextResponse.json({ user: { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol }, token });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

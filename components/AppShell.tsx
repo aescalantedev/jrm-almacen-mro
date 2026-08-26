@@ -8,12 +8,26 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppTopbar } from "@/components/layout/AppTopbar";
 import { Toaster } from "@/components/ui/sonner";
 
+import { useAuth } from "@/app/inventario/hooks/use-auth";
+import { Loader2 } from "lucide-react";
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { isLoading: authLoading } = useAuth();
 
   const isPublicPage =
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/error");
+    pathname.startsWith("/error") ||
+    pathname === "/"; // RootPage also does redirects
+
+  if (authLoading && !isPublicPage) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background gap-4">
+        <Loader2 className="animate-spin text-primary" size={48} />
+        <span className="text-muted-foreground font-medium animate-pulse">Autenticando...</span>
+      </div>
+    );
+  }
 
   return (
     <>

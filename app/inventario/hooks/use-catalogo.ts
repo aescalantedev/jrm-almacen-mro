@@ -11,17 +11,19 @@ export function useCatalogo(token: string) {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [pendingFilter, setPendingFilter] = useState(false);
 
   const hasMore = catalogItems.length < total;
 
   const loadPage = useCallback(
-    async (q: string, pageNum: number, append: boolean) => {
+    async (q: string, pageNum: number, append: boolean, pending: boolean) => {
       if (!token) return;
       if (append) setLoadingMore(true);
       else setLoadingCatalog(true);
       try {
         const params = new URLSearchParams({ page: String(pageNum), limit: String(PAGE_SIZE) });
         if (q) params.set("q", q);
+        if (pending) params.set("pending", "true");
         const res = await fetch(`/api/stock?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -40,17 +42,19 @@ export function useCatalogo(token: string) {
   );
 
   const loadCatalog = useCallback(
-    (q?: string) => {
+    (q?: string, pFilter?: boolean) => {
       const query = q !== undefined ? q : catalogSearch;
+      const pending = pFilter !== undefined ? pFilter : pendingFilter;
       if (q !== undefined) setCatalogSearch(q);
-      return loadPage(query, 1, false);
+      if (pFilter !== undefined) setPendingFilter(pFilter);
+      return loadPage(query, 1, false, pending);
     },
-    [loadPage, catalogSearch]
+    [loadPage, catalogSearch, pendingFilter]
   );
 
   const loadMore = useCallback(() => {
-    return loadPage(catalogSearch, page + 1, true);
-  }, [loadPage, catalogSearch, page]);
+    return loadPage(catalogSearch, page + 1, true, pendingFilter);
+  }, [loadPage, catalogSearch, page, pendingFilter]);
 
   return {
     catalogItems,
@@ -62,5 +66,7 @@ export function useCatalogo(token: string) {
     setCatalogSearch,
     loadCatalog,
     loadMore,
+    pendingFilter,
+    setPendingFilter,
   };
 }

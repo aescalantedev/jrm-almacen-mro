@@ -12,6 +12,7 @@ import {
   MapPin,
   FileSpreadsheet,
   Loader2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -188,6 +189,15 @@ export function RegistrosTab({
             >
               Sobrante
             </Button>
+            <Button
+              type="button"
+              variant={recordFilterStatus === "PENDIENTE" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setRecordFilterStatus("PENDIENTE")}
+              className="h-9 text-xs px-3 rounded-xl shrink-0 text-slate-600 dark:text-slate-400"
+            >
+              Pendiente
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -284,6 +294,11 @@ export function RegistrosTab({
                     {item.presentacion && (
                       <span className="text-[10px] bg-secondary/60 px-1.5 py-0.5 rounded">{item.presentacion}</span>
                     )}
+                    {item.foto_path && (
+                      <a href={item.foto_path} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 hover:bg-primary/20">
+                        <ImageIcon className="h-3 w-3" /> Foto
+                      </a>
+                    )}
                   </div>
 
                   {item.comentario && (
@@ -369,6 +384,11 @@ export function RegistrosTab({
                       </td>
                       <td className="py-2.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {item.foto_path && (
+                            <a href={item.foto_path} target="_blank" rel="noreferrer" className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-primary/10 text-primary" title="Ver foto adjunta">
+                              <ImageIcon className="h-3.5 w-3.5" />
+                            </a>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => editRecord(item)} title="Editar conteo">
                             <Edit3 className="h-3.5 w-3.5 text-primary" />
                           </Button>

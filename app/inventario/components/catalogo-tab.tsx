@@ -21,9 +21,11 @@ interface CatalogoTabProps {
   total: number;
   catalogSearch: string;
   setCatalogSearch: (v: string) => void;
-  loadCatalog: (q?: string) => Promise<void>;
+  loadCatalog: (q?: string, pendingOnly?: boolean) => Promise<void>;
   loadMore: () => Promise<void>;
   onSelectStock: (item: StockItem) => void;
+  pendingFilter: boolean;
+  setPendingFilter: (v: boolean) => void;
 }
 
 function SkeletonCard() {
@@ -54,6 +56,8 @@ export function CatalogoTab({
   loadCatalog,
   loadMore,
   onSelectStock,
+  pendingFilter,
+  setPendingFilter,
 }: CatalogoTabProps) {
   return (
     <Card className="border-border/60 shadow-xs">
@@ -74,7 +78,7 @@ export function CatalogoTab({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => loadCatalog(catalogSearch)}
+            onClick={() => loadCatalog(catalogSearch, pendingFilter)}
             disabled={loadingCatalog}
             className="h-8 text-xs font-semibold gap-1.5 rounded-lg"
           >
@@ -89,7 +93,7 @@ export function CatalogoTab({
             <Input
               value={catalogSearch}
               onChange={(e) => setCatalogSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && loadCatalog(catalogSearch)}
+              onKeyDown={(e) => e.key === "Enter" && loadCatalog(catalogSearch, pendingFilter)}
               placeholder="Buscar en catálogo por código SKU, descripción o lote..."
               className="pl-9 h-10 text-xs rounded-xl bg-secondary/30"
             />
@@ -98,7 +102,7 @@ export function CatalogoTab({
                 type="button"
                 onClick={() => {
                   setCatalogSearch("");
-                  loadCatalog("");
+                  loadCatalog("", pendingFilter);
                 }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
               >
@@ -106,18 +110,53 @@ export function CatalogoTab({
               </button>
             )}
           </div>
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-[10px] font-bold uppercase text-muted-foreground">Filtro rápido:</span>
+            <div className="flex items-center gap-1.5 p-1 bg-secondary/40 rounded-lg">
+              <Button
+                variant={!pendingFilter ? "default" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setPendingFilter(false);
+                  loadCatalog(catalogSearch, false);
+                }}
+                className={`h-7 px-3 text-[11px] rounded-md transition-all ${!pendingFilter ? "shadow-sm" : ""}`}
+              >
+                Todos
+              </Button>
+              <Button
+                variant={pendingFilter ? "default" : "ghost"}
+                size="sm"
+                onClick={() => {
+                  setPendingFilter(true);
+                  loadCatalog(catalogSearch, true);
+                }}
+                className={`h-7 px-3 text-[11px] rounded-md transition-all ${pendingFilter ? "shadow-sm bg-slate-600 text-white hover:bg-slate-700" : ""}`}
+              >
+                Solo Pendientes
+              </Button>
+            </div>
+          </div>
         </div>
       </CardHeader>
 
       <CardContent className="p-0">
         {loadingCatalog ? (
-          <div className="md:hidden">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="border-b border-border/20">
-                <SkeletonCard />
+          <>
+            <div className="md:hidden">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="border-b border-border/20">
+                  <SkeletonCard />
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block py-12">
+              <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="text-sm font-medium">Cargando catálogo...</span>
               </div>
-            ))}
-          </div>
+            </div>
+          </>
         ) : catalogItems.length === 0 ? (
           <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
             <Package className="h-8 w-8 opacity-30" />

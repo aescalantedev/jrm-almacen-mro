@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+import { toast } from "sonner";
 import {
   Search,
   Save,
@@ -18,6 +20,8 @@ import {
   Tag,
   ChevronDown,
   ChevronUp,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
+import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import { ObsBadge } from "./obs-badge";
 import { FAMILIA2_OPTIONS, PRESENTACION_OPTIONS, UM_OPTIONS } from "../constants";
 import type { ConteoForm, StockItem } from "../types";
@@ -74,23 +79,82 @@ export function ConteoTab({
   catalogCount,
   onGoToCatalogo,
 }: ConteoTabProps) {
+  const [uploading, setUploading] = React.useState(false);
+  const [scannerOpen, setScannerOpen] = React.useState(false);
+
+  const handleScanResult = (result: string) => {
+    setSearchQuery(result);
+    // Optionally trigger search automatically:
+    // searchStock(); // (Wait, since searchStock uses the state, we might need a useEffect or pass the query directly. But the user has to click search or we can let them see the result first)
+    toast.success(`Código escaneado: ${result}`);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const raw = localStorage.getItem("mro_auth");
+      const token = raw ? JSON.parse(raw).token : "";
+      
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setForm(prev => ({ ...prev, foto_path: data.url }));
+        toast.success("Foto adjuntada");
+      } else {
+        toast.error("Error al subir foto: " + data.error);
+      }
+    } catch (err) {
+      toast.error("Error de conexión");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* STEP 1: SEARCH BAR */}
+      <BarcodeScanner 
+        open={scannerOpen} 
+        onOpenChange={setScannerOpen} 
+        onResult={handleScanResult} 
+      />
       <Card className="border-border/60 shadow-xs">
         <CardContent className="p-3 sm:p-4 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && searchStock()}
-                placeholder="Código SKU, glosa o lote (ej: 20.90.04...)"
-                className="pl-11 pr-10 font-mono text-sm sm:text-base h-12 rounded-xl bg-secondary/30 focus-visible:ring-2 focus-visible:ring-primary/40"
-                autoCapitalize="characters"
-                autoComplete="off"
-              />
+          <div className="relative flex items-center w-full group">
+            {/* Botón de Escanear Código de Barras (Izquierda) */}
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setScannerOpen(true)}
+              className="absolute left-1.5 h-9 w-9 text-muted-foreground hover:text-primary transition-colors z-10"
+              title="Escanear Código"
+            >
+              <Barcode className="h-5 w-5" />
+            </Button>
+
+            {/* Input Principal */}
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchStock()}
+              placeholder="Código SKU, glosa o lote..."
+              className="pl-12 pr-24 font-mono text-sm sm:text-base h-12 rounded-xl bg-secondary/30 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all border-border/50 group-focus-within:border-primary/40 group-focus-within:bg-background"
+              autoCapitalize="characters"
+              autoComplete="off"
+            />
+
+            {/* Acciones Derecha (Limpiar y Buscar) */}
+            <div className="absolute right-1.5 flex items-center gap-1">
               {searchQuery && (
                 <button
                   type="button"
@@ -98,25 +162,28 @@ export function ConteoTab({
                     setSearchQuery("");
                     setStockResults([]);
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-full"
+                  className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors mr-1"
+                  title="Limpiar"
                 >
                   <X className="h-4 w-4" />
                 </button>
               )}
+              
+              <Button
+                type="button"
+                onClick={searchStock}
+                disabled={searching}
+                size="sm"
+                className="h-9 px-3 rounded-lg shadow-sm"
+                title="Buscar"
+              >
+                {searching ? (
+                  <Loader2 className="animate-spin h-4 w-4" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
             </div>
-            <Button
-              type="button"
-              onClick={searchStock}
-              disabled={searching}
-              className="h-12 px-6 font-bold text-sm rounded-xl shrink-0"
-            >
-              {searching ? (
-                <Loader2 className="animate-spin mr-2 h-4 w-4" />
-              ) : (
-                <Search className="mr-2 h-4 w-4" />
-              )}
-              Buscar Producto
-            </Button>
           </div>
 
           {stockResults.length > 0 && (
@@ -544,6 +611,36 @@ export function ConteoTab({
                       className="h-10 text-xs mt-1 rounded-xl"
                     />
                   </div>
+                </div>
+
+                <div className="pt-2">
+                  <Label className="text-xs font-semibold block mb-2">Evidencia Fotográfica (Opcional)</Label>
+                  {form.foto_path ? (
+                    <div className="flex items-center gap-2">
+                      <div className="relative h-16 w-16 rounded-xl overflow-hidden border border-border/50">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={form.foto_path} alt="Evidencia" className="h-full w-full object-cover" />
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setForm(prev => ({ ...prev, foto_path: undefined }))} className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10">
+                        <X className="h-4 w-4 mr-1" /> Quitar
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" onClick={() => document.getElementById('camera-upload')?.click()} disabled={uploading} className="h-10 text-xs gap-1.5 rounded-xl">
+                        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                        {uploading ? "Subiendo..." : "Tomar Foto / Subir"}
+                      </Button>
+                      <input 
+                        id="camera-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        onChange={handleFileUpload} 
+                        className="hidden" 
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

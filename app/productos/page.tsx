@@ -9,6 +9,7 @@ import {
   Loader2,
   Edit3,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useAuth } from "../inventario/hooks/use-auth";
 
 interface ProductoMaster {
   producto: string;
@@ -183,12 +185,11 @@ export default function ProductosPage() {
   const [editForm, setEditForm] = useState<Partial<ProductoMaster>>({});
   const [saving, setSaving] = useState(false);
 
+  const { user, token, isLoading: authLoading } = useAuth();
+
   const hasMore = items.length < total;
 
-  const getToken = () => {
-    const raw = localStorage.getItem("mro_auth");
-    return raw ? JSON.parse(raw).token : "";
-  };
+  const getToken = () => token || "";
 
   const loadPage = useCallback(
     async (q: string, pageNum: number, append: boolean) => {
@@ -211,12 +212,14 @@ export default function ProductosPage() {
         setLoadingMore(false);
       }
     },
-    []
+    [token]
   );
 
   useEffect(() => {
-    loadPage("", 1, false);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (token) {
+      loadPage("", 1, false);
+    }
+  }, [token, loadPage]);
 
   const handleSearch = () => {
     setEditingItem(null);
@@ -276,6 +279,20 @@ export default function ProductosPage() {
       setSaving(false);
     }
   };
+
+
+  if (!user) return null;
+
+  if (user.rol !== 'admin' && user.rol !== 'auditor') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <AlertTriangle className="h-12 w-12 text-rose-500" />
+        <h2 className="text-xl font-bold">Acceso Denegado</h2>
+        <p className="text-muted-foreground">No tienes permisos para ver los productos.</p>
+        <Button onClick={() => window.location.href = '/inventario'}>Ir a Inventario</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-4">
@@ -480,7 +497,7 @@ export default function ProductosPage() {
 
       {/* EDIT DIALOG — full-screen on mobile, centered on desktop */}
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
-        <DialogContent className="fixed inset-0 z-50 w-full h-full translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto sm:fixed sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:h-auto sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:p-6 sm:shadow-lg">
+        <DialogContent aria-describedby={undefined} className="fixed inset-0 z-50 w-full h-full translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto sm:fixed sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:h-auto sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:p-6 sm:shadow-lg">
           <DialogHeader className="p-4 sm:p-0 sm:pb-2 border-b sm:border-b-0 sticky top-0 bg-background z-10">
             <DialogTitle className="text-base sm:text-lg">
               Editar Producto

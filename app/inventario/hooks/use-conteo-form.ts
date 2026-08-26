@@ -159,6 +159,7 @@ export function useConteoForm(
         contenedor: item.contenedor || "",
         observacion: item.observacion || "OK",
         comentario: item.comentario || "",
+        foto_path: item.foto_path,
       });
       setIsEditing(item.id);
       setActiveTab("conteo");

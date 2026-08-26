@@ -22,7 +22,7 @@ function initSchema(db: Database.Database) {
       nombre TEXT NOT NULL,
       usuario TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
-      rol TEXT NOT NULL CHECK(rol IN ('contador', 'admin')),
+      rol TEXT NOT NULL CHECK(rol IN ('contador', 'admin', 'almacenero', 'auditor')),
       activo INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now', '-5 hours'))
     );
@@ -204,6 +204,29 @@ function migrateOldSchema(db: Database.Database) {
           SELECT ${migrateInvCols.join(', ')} FROM inventario`);
         db.exec(`DROP TABLE inventario`);
         db.exec(`ALTER TABLE inventario_new RENAME TO inventario`);
+      }
+
+      // Migrate usuarios to include new roles
+      const userCols = tableNames.includes('usuarios')
+        ? (db.prepare("PRAGMA table_info(usuarios)").all() as { name: string }[]).map(c => c.name)
+        : [];
+      if (userCols.length > 0) {
+        db.exec(`CREATE TABLE usuarios_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT NOT NULL,
+          usuario TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          rol TEXT NOT NULL CHECK(rol IN ('contador', 'admin', 'almacenero', 'auditor')),
+          activo INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now', '-5 hours'))
+        )`);
+        
+        const migrateUserCols = ['id', 'nombre', 'usuario', 'password_hash', 'rol', 'activo', 'created_at'].filter(c => userCols.includes(c));
+        db.exec(`INSERT INTO usuarios_new (${migrateUserCols.join(', ')})
+          SELECT ${migrateUserCols.join(', ')} FROM usuarios`);
+        db.exec(`UPDATE usuarios_new SET rol = 'almacenero' WHERE rol = 'contador'`);
+        db.exec(`DROP TABLE usuarios`);
+        db.exec(`ALTER TABLE usuarios_new RENAME TO usuarios`);
       }
 
       ensureIndexes(db);

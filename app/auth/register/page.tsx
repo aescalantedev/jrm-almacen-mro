@@ -15,7 +15,6 @@ export default function RegisterPage() {
   const [nombre, setNombre] = useState("");
   const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
-  const [rol, setRol] = useState("contador");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -26,7 +25,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, usuario, password, rol }),
+        body: JSON.stringify({ nombre, usuario, password, rol: "almacenero" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -76,13 +75,6 @@ export default function RegisterPage() {
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="rol" className="text-xs font-semibold">Rol</Label>
-              <select id="rol" value={rol} onChange={(e) => setRol(e.target.value)} className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                <option value="contador">Contador</option>
-                <option value="admin">Administrador</option>
-              </select>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">

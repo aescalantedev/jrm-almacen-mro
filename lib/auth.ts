@@ -8,7 +8,7 @@ export interface UserPayload {
   id: number;
   nombre: string;
   usuario: string;
-  rol: 'contador' | 'admin';
+  rol: 'contador' | 'admin' | 'almacenero' | 'auditor';
 }
 
 export function hashPassword(password: string): string {

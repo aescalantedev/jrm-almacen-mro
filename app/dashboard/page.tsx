@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { IRAContent } from "./components/ira-content";
+import { useAuth } from "../inventario/hooks/use-auth";
 
 interface DashboardStats {
   totalRegistros: number;
@@ -96,10 +97,11 @@ export default function DashboardPage() {
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "ira">("general");
 
+  const { user, token, isLoading: authLoading } = useAuth();
+
   const loadDashboard = useCallback(async () => {
+    if (!token) return;
     try {
-      const raw = localStorage.getItem("mro_auth");
-      const token = raw ? JSON.parse(raw).token : "";
       const [dashRes, syncRes] = await Promise.all([
         fetch("/api/admin", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/sync", { headers: { Authorization: `Bearer ${token}` } }),
@@ -118,7 +120,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     loadDashboard();
@@ -166,8 +168,21 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <Loader2 className="animate-spin text-primary" size={36} />
+      <div className="flex items-center justify-center min-h-[50vh] flex-col gap-4">
+        <Loader2 className="animate-spin text-primary" size={48} />
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  if (user?.rol !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <AlertTriangle className="h-12 w-12 text-rose-500" />
+        <h2 className="text-xl font-bold">Acceso Denegado</h2>
+        <p className="text-muted-foreground">No tienes permisos para ver el dashboard.</p>
+        <Button onClick={() => window.location.href = '/inventario'}>Ir a Inventario</Button>
       </div>
     );
   }
@@ -281,7 +296,7 @@ export default function DashboardPage() {
       ) : (
         <>
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
         {/* SKUs Sistema */}
         <Card className="border-border/60 shadow-xs">
           <CardContent className="p-4 space-y-1">
@@ -309,6 +324,20 @@ export default function DashboardPage() {
             <div className="text-[10px] text-muted-foreground font-semibold">
               {stats?.porcentajeCompletado || 0}% del total
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Pendientes */}
+        <Card className="border-border/60 shadow-xs">
+          <CardContent className="p-4 space-y-1">
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider">Pendientes</span>
+              <Clock className="h-4 w-4 text-slate-500" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-slate-600 dark:text-slate-400">
+              {((stats?.stockTotal || 0) - (stats?.totalAuditados || 0)).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-slate-600/80 font-medium">Falta contar</div>
           </CardContent>
         </Card>
 

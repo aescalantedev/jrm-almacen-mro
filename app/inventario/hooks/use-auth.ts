@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { User } from "../types";
 
 function readAuthFromStorage(): { user: User | null; token: string } {
@@ -16,15 +16,29 @@ function readAuthFromStorage(): { user: User | null; token: string } {
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(() => {
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
     const auth = readAuthFromStorage();
     if (!auth.user || !auth.token) {
-      if (typeof window !== "undefined") window.location.href = "/auth/login";
+      const isPublic = window.location.pathname.startsWith('/auth');
+      if (!isPublic) {
+        window.location.href = "/auth/login";
+      } else {
+        setIsLoading(false);
+      }
+    } else {
+      setUser(auth.user);
+      setToken(auth.token);
+      setIsLoading(false);
     }
-    return auth.user;
-  });
+  }, []);
+  const logout = () => {
+    localStorage.removeItem("mro_auth");
+    window.location.href = "/auth/login";
+  };
 
-  const [token, setToken] = useState(() => readAuthFromStorage().token);
-
-  return { user, setUser, token, setToken };
+  return { user, setUser, token, setToken, isLoading, logout };
 }

@@ -70,6 +70,8 @@ export default function InventarioPage() {
     setCatalogSearch,
     loadCatalog,
     loadMore: loadMoreCatalog,
+    pendingFilter,
+    setPendingFilter,
   } = useCatalogo(token);
 
   useEffect(() => {
@@ -83,6 +85,8 @@ export default function InventarioPage() {
       loadCatalog();
     }
   }, [activeTab, token, catalogItems.length, loadCatalog]);
+
+  if (!user) return null;
 
   const tabContent = (
     <>
@@ -142,6 +146,8 @@ export default function InventarioPage() {
           loadCatalog={loadCatalog}
           loadMore={loadMoreCatalog}
           onSelectStock={selectStock}
+          pendingFilter={pendingFilter}
+          setPendingFilter={setPendingFilter}
         />
       </TabsContent>
     </>

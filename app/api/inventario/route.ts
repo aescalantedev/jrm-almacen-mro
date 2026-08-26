@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '9999');
     const offset = (page - 1) * limit;
-    let conditions: string[] = [];
+    let conditions: string[] = ['(i.cantidad_fisica != 0 OR i.usuario_id IS NOT NULL)'];
     let params: unknown[] = [];
     if (query) { conditions.push('(i.producto LIKE ? OR p.glosa LIKE ? OR i.lote LIKE ?)'); const p = `%${query}%`; params.push(p, p, p); }
     if (usuario_id) { conditions.push('i.usuario_id = ?'); params.push(parseInt(usuario_id)); }

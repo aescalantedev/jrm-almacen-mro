@@ -32,11 +32,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { navigationGroups } from "@/config/navigation";
+import { useAuth } from "@/app/inventario/hooks/use-auth";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { state, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const { user } = useAuth();
+
+  const filteredGroups = navigationGroups
+    .map(group => {
+      // Si el grupo tiene items, filtramos sus items por rol
+      if (group.items) {
+        return {
+          ...group,
+          items: group.items.filter(item => !item.roles || (user?.rol && item.roles.includes(user.rol)))
+        };
+      }
+      return group;
+    })
+    .filter(group => {
+      if (!group.roles) return group.items.length > 0;
+      return user?.rol && group.roles.includes(user.rol) && group.items.length > 0;
+    });
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border/50">
@@ -52,7 +70,7 @@ export function AppSidebar() {
       </SidebarHeader>
       
       <SidebarContent className="gap-0 scrollbar-none">
-        {navigationGroups.map((group) => (
+        {filteredGroups.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel className="px-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 mt-6 mb-2">
               {group.label}

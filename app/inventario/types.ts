@@ -45,11 +45,14 @@ export interface InventarioItem {
   prioridad: string;
   usuario_nombre: string;
   updated_at: string;
+  foto_path?: string;
 }
 
 export interface User {
   id: number;
   nombre: string;
+  usuario?: string;
+  rol?: string;
 }
 
 export interface ConteoForm {
@@ -74,4 +77,5 @@ export interface ConteoForm {
   ubicacion_actual: string;
   almacenamiento: string;
   contenedor: string;
+  foto_path?: string;
 }

@@ -18,16 +18,19 @@ export interface NavItem {
   url: string;
   icon: LucideIcon;
   items?: NavItem[];
+  roles?: string[];
 }
 
 export interface NavGroup {
   label: string;
   items: NavItem[];
+  roles?: string[];
 }
 
 export const navigationGroups: NavGroup[] = [
   {
     label: "Principal",
+    roles: ["admin", "auditor"],
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
     ],
@@ -36,24 +39,27 @@ export const navigationGroups: NavGroup[] = [
     label: "Operaciones",
     items: [
       { title: "Inventario", url: "/inventario", icon: ClipboardCheck },
-      { title: "Productos", url: "/productos", icon: Package },
-      { title: "Sincronizar Stock", url: "/sync", icon: RefreshCw },
+      { title: "Productos", url: "/productos", icon: Package, roles: ["admin", "auditor"] },
     ],
   },
   {
     label: "Sistema",
+    roles: ["admin"],
     items: [
       {
         title: "Usuarios",
         icon: Users,
+        url: "/users",
+      },
+      {
+        title: "Configuración",
+        icon: Settings,
         url: "#",
         items: [
-          { title: "Lista", url: "/users", icon: Users },
-          { title: "Roles", url: "/users/roles", icon: ShieldCheck },
-          { title: "Agregar", url: "/users/add", icon: UserPlus },
+          { title: "General", url: "/settings", icon: Settings },
+          { title: "Sincronizar Stock", url: "/settings/sync", icon: RefreshCw },
         ]
       },
-      { title: "Configuracion", url: "/settings", icon: Settings },
     ],
   },
 ];
