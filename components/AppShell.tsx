@@ -37,11 +37,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       ) : (
         <SidebarProvider>
-          <div className="flex min-h-screen w-full">
+          <div className="flex h-[100dvh] w-full overflow-hidden">
             <AppSidebar />
-            <SidebarInset className="flex flex-col bg-secondary/10 dark:bg-secondary/5">
-              <div className="flex-1 flex flex-col overflow-y-auto">
-                <AppTopbar />
+            <SidebarInset className="flex flex-col bg-secondary/10 dark:bg-secondary/5 h-[100dvh] w-full overflow-hidden">
+              <AppTopbar />
+              <div className="flex-1 flex flex-col w-full overflow-y-auto">
                 <main className="flex-1 p-3 sm:p-5 lg:p-6 w-full min-w-0 max-w-full">
                   {children}
                 </main>
