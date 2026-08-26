@@ -37,17 +37,7 @@ export default function SettingsProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="p-6 md:p-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      
-      {/* PAGE HEADER */}
-      <div className="space-y-1">
-        <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">Configuración</h1>
-        <p className="text-sm text-muted-foreground font-medium">
-          Administra los datos de tu cuenta personal y seguridad.
-        </p>
-      </div>
-
-      <Separator className="bg-border/50" />
+    <div className="w-full space-y-4 animate-in fade-in duration-300 pb-16">
 
       <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
         

@@ -111,26 +111,7 @@ export default function SyncPage() {
   }
 
   return (
-    <div className="w-full space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <RefreshCw className="h-6 w-6 text-primary" />
-            Sincronización de Stock
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Actualización de existencias e inventario desde SQL Server (Flexline — ALM MRO CHILCA)
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="px-3 py-1.5 gap-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            Servicio Flexline Activo
-          </Badge>
-        </div>
-      </div>
-
+    <div className="w-full space-y-4">
       {/* Control Panel Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Main Sync Trigger Card */}

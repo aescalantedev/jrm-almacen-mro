@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Warehouse, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -17,6 +17,20 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("mro_auth");
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d?.token && d?.user) {
+          router.replace("/inventario");
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -28,15 +42,19 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Error al iniciar sesion");
+        toast.error(data.error || "Error al iniciar sesión");
         setLoading(false);
         return;
       }
       localStorage.setItem("mro_auth", JSON.stringify(data));
       toast.success(`Bienvenido ${data.user.nombre}`);
-      router.push("/dashboard");
+      if (data.user.rol === "admin" || data.user.rol === "auditor") {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/inventario");
+      }
     } catch {
-      toast.error("Error de conexion");
+      toast.error("Error de conexión");
       setLoading(false);
     }
   };

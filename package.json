@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "maint:on": "node scripts/maintenance.mjs on",
+    "maint:off": "node scripts/maintenance.mjs off",
+    "maint:status": "node scripts/maintenance.mjs status"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

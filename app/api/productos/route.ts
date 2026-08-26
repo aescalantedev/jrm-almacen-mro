@@ -12,22 +12,40 @@ export async function GET(req: NextRequest) {
 
     let items, total;
     if (query) {
-      const p = `%${query}%`;
+      const p = `%${query.trim()}%`;
       items = db.prepare(`
         SELECT p.*,
                COUNT(DISTINCT i.id) as inventario_count,
                COUNT(DISTINCT s.lote) as lotes_count,
-               COALESCE(SUM(s.stock), 0) as stock_total
+               COALESCE(
+                 NULLIF((SELECT inv.rack FROM inventario inv WHERE inv.producto = p.producto AND inv.rack != '' ORDER BY inv.id DESC LIMIT 1), ''),
+                 NULLIF((SELECT inv.ubicacion_actual FROM inventario inv WHERE inv.producto = p.producto AND inv.ubicacion_actual != '' ORDER BY inv.id DESC LIMIT 1), ''),
+                 NULLIF((SELECT sc.ubicacion FROM stock_cache sc WHERE sc.producto = p.producto AND sc.ubicacion != '' LIMIT 1), ''),
+                 NULLIF((SELECT m.rack FROM movimientos m WHERE m.producto = p.producto AND m.rack != '' ORDER BY m.id DESC LIMIT 1), ''),
+                 'Sin asignar'
+               ) as rack,
+               COALESCE(
+                 (
+                   SELECT SUM(COALESCE(inv.cantidad_fisica, sc.stock, 0))
+                   FROM stock_cache sc
+                   LEFT JOIN inventario inv ON sc.producto = inv.producto AND IFNULL(sc.lote, '') = IFNULL(inv.lote, '')
+                   WHERE sc.producto = p.producto
+                 ),
+                 0
+               ) + COALESCE(
+                 (SELECT SUM(CASE WHEN m.tipo = 'INGRESO' THEN m.cantidad ELSE -m.cantidad END) FROM movimientos m WHERE m.producto = p.producto),
+                 0
+               ) as stock_total
         FROM productos_master p
         LEFT JOIN inventario i ON p.producto = i.producto
         LEFT JOIN stock_cache s ON p.producto = s.producto
-        WHERE p.producto LIKE ? OR p.glosa LIKE ? OR p.familia LIKE ?
+        WHERE UPPER(p.producto) LIKE UPPER(?) OR UPPER(p.glosa) LIKE UPPER(?) OR UPPER(p.familia) LIKE UPPER(?)
         GROUP BY p.producto
         ORDER BY p.glosa LIMIT ? OFFSET ?
       `).all(p, p, p, limit, offset);
       const c = db.prepare(`
         SELECT COUNT(*) as total FROM productos_master p
-        WHERE p.producto LIKE ? OR p.glosa LIKE ? OR p.familia LIKE ?
+        WHERE UPPER(p.producto) LIKE UPPER(?) OR UPPER(p.glosa) LIKE UPPER(?) OR UPPER(p.familia) LIKE UPPER(?)
       `).get(p, p, p) as { total: number };
       total = c.total;
     } else {
@@ -35,7 +53,25 @@ export async function GET(req: NextRequest) {
         SELECT p.*,
                COUNT(DISTINCT i.id) as inventario_count,
                COUNT(DISTINCT s.lote) as lotes_count,
-               COALESCE(SUM(s.stock), 0) as stock_total
+               COALESCE(
+                 NULLIF((SELECT inv.rack FROM inventario inv WHERE inv.producto = p.producto AND inv.rack != '' ORDER BY inv.id DESC LIMIT 1), ''),
+                 NULLIF((SELECT inv.ubicacion_actual FROM inventario inv WHERE inv.producto = p.producto AND inv.ubicacion_actual != '' ORDER BY inv.id DESC LIMIT 1), ''),
+                 NULLIF((SELECT sc.ubicacion FROM stock_cache sc WHERE sc.producto = p.producto AND sc.ubicacion != '' LIMIT 1), ''),
+                 NULLIF((SELECT m.rack FROM movimientos m WHERE m.producto = p.producto AND m.rack != '' ORDER BY m.id DESC LIMIT 1), ''),
+                 'Sin asignar'
+               ) as rack,
+               COALESCE(
+                 (
+                   SELECT SUM(COALESCE(inv.cantidad_fisica, sc.stock, 0))
+                   FROM stock_cache sc
+                   LEFT JOIN inventario inv ON sc.producto = inv.producto AND IFNULL(sc.lote, '') = IFNULL(inv.lote, '')
+                   WHERE sc.producto = p.producto
+                 ),
+                 0
+               ) + COALESCE(
+                 (SELECT SUM(CASE WHEN m.tipo = 'INGRESO' THEN m.cantidad ELSE -m.cantidad END) FROM movimientos m WHERE m.producto = p.producto),
+                 0
+               ) as stock_total
         FROM productos_master p
         LEFT JOIN inventario i ON p.producto = i.producto
         LEFT JOIN stock_cache s ON p.producto = s.producto

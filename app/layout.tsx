@@ -12,12 +12,19 @@ const fontSans = Plus_Jakarta_Sans({
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
+  themeColor: "#0f172a",
 };
 
 export const metadata: Metadata = {
   title: "MRO Inventario — ALM MRO CHILCA",
   description: "Sistema de Inventario MRO para bodega ALM MRO CHILCA",
+  manifest: "/manifest.json",
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({

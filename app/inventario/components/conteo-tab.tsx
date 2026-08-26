@@ -14,14 +14,15 @@ import {
   Minus,
   Copy,
   X,
-  Box,
   Scale,
   Ruler,
-  Tag,
   ChevronDown,
   ChevronUp,
   Camera,
-  Image as ImageIcon,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import { ObsBadge } from "./obs-badge";
 import { FAMILIA2_OPTIONS, PRESENTACION_OPTIONS, UM_OPTIONS } from "../constants";
+import { cleanNumberDisplay } from "../utils";
 import type { ConteoForm, StockItem } from "../types";
 
 interface ConteoTabProps {
@@ -48,9 +50,9 @@ interface ConteoTabProps {
   searching: boolean;
   dif: number;
   pesoTotal: number;
-  updateQuantity: (qty: number) => void;
+  updateQuantity: (qty: number | string) => void;
   clearForm: () => void;
-  searchStock: () => Promise<void>;
+  searchStock: (queryOverride?: string, autoSelectExact?: boolean) => Promise<void>;
   selectStock: (item: StockItem) => void;
   handleSave: () => Promise<void>;
   catalogCount: number;
@@ -81,12 +83,30 @@ export function ConteoTab({
 }: ConteoTabProps) {
   const [uploading, setUploading] = React.useState(false);
   const [scannerOpen, setScannerOpen] = React.useState(false);
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.toUpperCase();
+    setSearchQuery(val);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    if (val.trim().length >= 2) {
+      debounceTimerRef.current = setTimeout(() => {
+        searchStock(val, false);
+      }, 250);
+    } else if (val.trim().length === 0) {
+      setStockResults([]);
+    }
+  };
 
   const handleScanResult = (result: string) => {
-    setSearchQuery(result);
-    // Optionally trigger search automatically:
-    // searchStock(); // (Wait, since searchStock uses the state, we might need a useEffect or pass the query directly. But the user has to click search or we can let them see the result first)
-    toast.success(`Código escaneado: ${result}`);
+    const cleanResult = result.trim();
+    setSearchQuery(cleanResult);
+    setScannerOpen(false);
+    searchStock(cleanResult, true);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +132,7 @@ export function ConteoTab({
       } else {
         toast.error("Error al subir foto: " + data.error);
       }
-    } catch (err) {
+    } catch {
       toast.error("Error de conexión");
     } finally {
       setUploading(false);
@@ -145,9 +165,9 @@ export function ConteoTab({
             {/* Input Principal */}
             <Input
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchInputChange}
               onKeyDown={(e) => e.key === "Enter" && searchStock()}
-              placeholder="Código SKU, glosa o lote..."
+              placeholder="Buscar SKU, glosa o lote (ej: RPTS01, 801., etc.)..."
               className="pl-12 pr-24 font-mono text-sm sm:text-base h-12 rounded-xl bg-secondary/30 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all border-border/50 group-focus-within:border-primary/40 group-focus-within:bg-background"
               autoCapitalize="characters"
               autoComplete="off"
@@ -171,7 +191,7 @@ export function ConteoTab({
               
               <Button
                 type="button"
-                onClick={searchStock}
+                onClick={() => searchStock()}
                 disabled={searching}
                 size="sm"
                 className="h-9 px-3 rounded-lg shadow-sm"
@@ -206,13 +226,28 @@ export function ConteoTab({
                     onClick={() => selectStock(item)}
                     role="button"
                     tabIndex={0}
-                    className="w-full text-left p-3 rounded-xl border border-border/40 hover:border-primary/50 hover:bg-primary/5 transition flex flex-col justify-between gap-2 cursor-pointer active:scale-[0.99]"
+                    className={`w-full text-left p-3 rounded-xl border transition flex flex-col justify-between gap-2 cursor-pointer active:scale-[0.99] ${
+                      item.ya_contado
+                        ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/60 hover:bg-emerald-500/10"
+                        : "border-border/40 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="font-mono font-bold text-xs bg-secondary px-2 py-0.5 rounded border border-border/60 text-foreground">
-                        {item.producto}
-                      </span>
-                      <span className="text-xs font-mono font-bold text-primary">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-bold text-xs bg-secondary px-2 py-0.5 rounded border border-border/60 text-foreground">
+                          {item.producto}
+                        </span>
+                        {item.ya_contado ? (
+                          <Badge variant="outline" className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold">
+                            ✓ Contado: {item.cantidad_fisica} {item.inventario_um || item.unidad}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/50">
+                            Pendiente
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs font-mono font-bold text-primary shrink-0">
                         Stock: {item.stock} {item.unidad}
                       </span>
                     </div>
@@ -238,7 +273,7 @@ export function ConteoTab({
         <Card className="border-border/60 shadow-md">
           <CardHeader className="p-4 bg-secondary/30 border-b border-border/40">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1">
+              <div className="space-y-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono font-black text-sm sm:text-base px-2.5 py-0.5 rounded-lg bg-primary text-primary-foreground">
                     {form.producto}
@@ -254,12 +289,12 @@ export function ConteoTab({
                     </Badge>
                   )}
                   {isEditing && (
-                    <Badge className="bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs">
-                      Editando #{isEditing}
+                    <Badge className="bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs font-semibold">
+                      Editando Conteo #{isEditing}
                     </Badge>
                   )}
                 </div>
-                <div className="text-sm font-semibold text-foreground mt-1">{form.descripcion}</div>
+                <div className="text-sm font-semibold text-foreground mt-1 line-clamp-2">{form.descripcion}</div>
               </div>
 
               <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
@@ -270,15 +305,18 @@ export function ConteoTab({
                     <span className="text-xs font-normal text-muted-foreground">{form.unidad}</span>
                   </div>
                 </div>
+
+                {/* BOTON CANCELAR VISIBLE Y DESTACADO */}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={clearForm}
-                  className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-9 px-3 text-xs font-bold text-rose-500 hover:text-rose-600 border-rose-500/30 hover:bg-rose-500/10 rounded-xl"
+                  title="Cancelar y seleccionar otro producto"
                 >
-                  <X className="h-3.5 w-3.5 mr-1" />
-                  Cambiar
+                  <X className="h-4 w-4 mr-1" />
+                  Cancelar
                 </Button>
               </div>
             </div>
@@ -315,154 +353,139 @@ export function ConteoTab({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => updateQuantity((form.cantidad_fisica || 0) - 1)}
-                    className="h-14 w-14 rounded-xl shrink-0 font-bold text-xl border-border/80 active:scale-95"
+                    size="icon"
+                    onClick={() => {
+                      const current = typeof form.cantidad_fisica === "number" ? form.cantidad_fisica : parseFloat(form.cantidad_fisica) || 0;
+                      updateQuantity(Math.max(0, current - 1));
+                    }}
+                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl shrink-0"
                   >
-                    <Minus className="h-6 w-6" />
+                    <Minus className="h-5 w-5" />
                   </Button>
 
-                  <div className="relative flex-1">
-                    <Input
-                      id="cant-fisica"
-                      type="number"
-                      step="any"
-                      inputMode="decimal"
-                      value={form.cantidad_fisica === 0 && !form.cantidad_fisica ? "" : form.cantidad_fisica}
-                      onChange={(e) => updateQuantity(Number(e.target.value))}
-                      required
-                      className="h-14 text-center font-mono text-2xl sm:text-3xl font-black rounded-xl bg-background border-2 border-primary/40 focus-visible:ring-4 focus-visible:ring-primary/20"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground uppercase pointer-events-none">
-                      {form.um || form.unidad || "UND"}
-                    </span>
-                  </div>
+                  <Input
+                    id="cant-fisica"
+                    type="number"
+                    step="any"
+                    min="0"
+                    inputMode="decimal"
+                    value={form.cantidad_fisica}
+                    onChange={(e) => updateQuantity(e.target.value)}
+                    placeholder="0"
+                    className="h-12 sm:h-14 text-center font-mono text-2xl sm:text-3xl font-black bg-background border-2 border-primary/40 focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
+                    autoFocus
+                  />
 
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => updateQuantity((form.cantidad_fisica || 0) + 1)}
-                    className="h-14 w-14 rounded-xl shrink-0 font-bold text-xl border-border/80 active:scale-95 text-primary"
+                    size="icon"
+                    onClick={() => {
+                      const current = typeof form.cantidad_fisica === "number" ? form.cantidad_fisica : parseFloat(form.cantidad_fisica) || 0;
+                      updateQuantity(current + 1);
+                    }}
+                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl shrink-0"
                   >
-                    <Plus className="h-6 w-6" />
+                    <Plus className="h-5 w-5" />
                   </Button>
                 </div>
 
-                {/* Quick Step Buttons */}
-                <div className="flex items-center justify-center gap-2 pt-1">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => updateQuantity((form.cantidad_fisica || 0) - 10)} className="h-8 px-3 text-xs font-mono">
-                    -10
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => updateQuantity((form.cantidad_fisica || 0) - 5)} className="h-8 px-3 text-xs font-mono">
-                    -5
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => updateQuantity((form.cantidad_fisica || 0) + 5)} className="h-8 px-3 text-xs font-mono">
-                    +5
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" onClick={() => updateQuantity((form.cantidad_fisica || 0) + 10)} className="h-8 px-3 text-xs font-mono">
-                    +10
-                  </Button>
+                {/* Quick Add Buttons */}
+                <div className="flex gap-1.5 sm:gap-2 pt-1">
+                  {[-10, -5, +5, +10].map((step) => (
+                    <Button
+                      key={step}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const current = typeof form.cantidad_fisica === "number" ? form.cantidad_fisica : parseFloat(form.cantidad_fisica) || 0;
+                        updateQuantity(Math.max(0, current + step));
+                      }}
+                      className="flex-1 h-8 text-xs font-mono font-bold rounded-lg bg-background"
+                    >
+                      {step > 0 ? `+${step}` : step}
+                    </Button>
+                  ))}
                 </div>
 
-                {/* LIVE DIFFERENCE & WEIGHT STATUS */}
-                <div className="mt-3 p-3 rounded-xl bg-background border border-border/50 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Diferencia (DIF):</span>
+                {/* SUMMARY ROW (DIF, ESTADO AUTO, PESO) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Diferencia (DIF):</span>
                     <span
-                      className={`font-mono font-bold px-2 py-0.5 rounded-md text-sm ${
+                      className={`font-mono font-extrabold ${
                         dif === 0
-                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          ? "text-emerald-600 dark:text-emerald-400"
                           : dif > 0
-                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                            : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-rose-600 dark:text-rose-400"
                       }`}
                     >
-                      {dif > 0 ? `+${dif}` : dif} {form.um || form.unidad}
+                      {dif > 0 ? `+${dif}` : dif} {form.unidad}
                     </span>
                     <ObsBadge status={form.observacion} />
                   </div>
 
                   <div className="text-muted-foreground">
-                    Peso Total:{" "}
-                    <strong className="font-mono text-foreground font-semibold">{pesoTotal.toFixed(3)} kg</strong>
+                    Peso Total: <strong className="font-mono text-foreground">{pesoTotal.toFixed(3)} kg</strong>
                   </div>
                 </div>
               </div>
 
-              {/* CLASSIFICATION */}
-              <div className="p-4 rounded-2xl bg-secondary/15 border border-border/50 space-y-3">
+              {/* CLASSIFICATION & PRESENTATION */}
+              <div className="p-4 rounded-2xl bg-secondary/15 border border-border/50 space-y-4">
                 <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5 text-primary" />
+                  <ClipboardList className="h-3.5 w-3.5 text-primary" />
                   Clasificación y Presentación
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs font-semibold">Familia 2 *</Label>
-                    <div className="mt-1">
-                      <Combobox
-                        options={FAMILIA2_OPTIONS.map((f) => ({ label: f, value: f }))}
-                        value={form.familia2}
-                        onChange={(val) => setForm((prev) => ({ ...prev, familia2: val }))}
-                        placeholder="Seleccionar familia..."
-                        searchPlaceholder="Buscar familia..."
-                      />
-                    </div>
+                    <Combobox
+                      value={form.familia2}
+                      onChange={(v) => setForm((prev) => ({ ...prev, familia2: v }))}
+                      options={FAMILIA2_OPTIONS}
+                      placeholder="Seleccionar familia..."
+                    />
                   </div>
 
                   <div>
                     <Label className="text-xs font-semibold">Unidad de Medida (UM) *</Label>
-                    <div className="mt-1">
-                      <Combobox
-                        options={UM_OPTIONS.map((u) => ({ label: u, value: u }))}
-                        value={form.um}
-                        onChange={(val) => setForm((prev) => ({ ...prev, um: val }))}
-                        placeholder="Seleccionar UM..."
-                        searchPlaceholder="Buscar unidad..."
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-xs font-semibold">Presentación *</Label>
-                    <div className="mt-1">
-                      <Combobox
-                        options={PRESENTACION_OPTIONS.map((p) => ({ label: p, value: p }))}
-                        value={form.presentacion}
-                        onChange={(val) => setForm((prev) => ({ ...prev, presentacion: val }))}
-                        placeholder="Seleccionar presentación..."
-                        searchPlaceholder="Buscar presentación..."
-                      />
-                    </div>
+                    <Combobox
+                      value={form.um}
+                      onChange={(v) => setForm((prev) => ({ ...prev, um: v }))}
+                      options={UM_OPTIONS}
+                      placeholder="Seleccionar UM..."
+                    />
                   </div>
                 </div>
-              </div>
 
-              {/* PACKAGING & DIMENSIONS */}
-              <div className="p-4 rounded-2xl bg-secondary/15 border border-border/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Box className="h-3.5 w-3.5 text-primary" />
-                    Empaque, Dimensiones y Peso
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold">Presentación *</Label>
+                    <Combobox
+                      value={form.presentacion}
+                      onChange={(v) => setForm((prev) => ({ ...prev, presentacion: v }))}
+                      options={PRESENTACION_OPTIONS}
+                      placeholder="Seleccionar presentación..."
+                    />
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="h-6 text-[11px] text-muted-foreground px-2"
-                  >
-                    {showAdvanced ? (
-                      <>
-                        <ChevronUp className="h-3.5 w-3.5 mr-1" />
-                        Ocultar
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-3.5 w-3.5 mr-1" />
-                        Mostrar
-                      </>
-                    )}
-                  </Button>
+
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAdvanced(!showAdvanced)}
+                      className="w-full h-10 text-xs font-semibold gap-1.5 rounded-xl border-border/60"
+                    >
+                      <Ruler className="h-3.5 w-3.5" />
+                      {showAdvanced ? "Ocultar Medidas y Bultos" : "Agregar Medidas y Bultos"}
+                      {showAdvanced ? <ChevronUp className="h-3.5 w-3.5 ml-auto" /> : <ChevronDown className="h-3.5 w-3.5 ml-auto" />}
+                    </Button>
+                  </div>
                 </div>
 
                 {showAdvanced && (
@@ -486,8 +509,9 @@ export function ConteoTab({
                           type="number"
                           step="any"
                           inputMode="decimal"
-                          value={form.peso_aprox_unitario || ""}
-                          onChange={(e) => setForm((prev) => ({ ...prev, peso_aprox_unitario: Number(e.target.value) }))}
+                          value={form.peso_aprox_unitario === 0 ? "0" : (form.peso_aprox_unitario ?? "")}
+                          onChange={(e) => setForm((prev) => ({ ...prev, peso_aprox_unitario: e.target.value }))}
+                          onBlur={() => setForm((prev) => ({ ...prev, peso_aprox_unitario: cleanNumberDisplay(prev.peso_aprox_unitario) }))}
                           placeholder="0.000"
                           className="h-10 text-xs mt-1 font-mono rounded-xl"
                         />
@@ -505,8 +529,9 @@ export function ConteoTab({
                             type="number"
                             step="any"
                             inputMode="decimal"
-                            value={form.largo || ""}
-                            onChange={(e) => setForm((prev) => ({ ...prev, largo: Number(e.target.value) }))}
+                            value={form.largo === 0 ? "0" : (form.largo ?? "")}
+                            onChange={(e) => setForm((prev) => ({ ...prev, largo: e.target.value }))}
+                            onBlur={() => setForm((prev) => ({ ...prev, largo: cleanNumberDisplay(prev.largo) }))}
                             placeholder="Largo (cm)"
                             className="h-10 text-xs font-mono rounded-xl text-center"
                           />
@@ -517,8 +542,9 @@ export function ConteoTab({
                             type="number"
                             step="any"
                             inputMode="decimal"
-                            value={form.ancho || ""}
-                            onChange={(e) => setForm((prev) => ({ ...prev, ancho: Number(e.target.value) }))}
+                            value={form.ancho === 0 ? "0" : (form.ancho ?? "")}
+                            onChange={(e) => setForm((prev) => ({ ...prev, ancho: e.target.value }))}
+                            onBlur={() => setForm((prev) => ({ ...prev, ancho: cleanNumberDisplay(prev.ancho) }))}
                             placeholder="Ancho (cm)"
                             className="h-10 text-xs font-mono rounded-xl text-center"
                           />
@@ -529,8 +555,9 @@ export function ConteoTab({
                             type="number"
                             step="any"
                             inputMode="decimal"
-                            value={form.alto || ""}
-                            onChange={(e) => setForm((prev) => ({ ...prev, alto: Number(e.target.value) }))}
+                            value={form.alto === 0 ? "0" : (form.alto ?? "")}
+                            onChange={(e) => setForm((prev) => ({ ...prev, alto: e.target.value }))}
+                            onBlur={() => setForm((prev) => ({ ...prev, alto: cleanNumberDisplay(prev.alto) }))}
                             placeholder="Alto (cm)"
                             className="h-10 text-xs font-mono rounded-xl text-center"
                           />
@@ -590,11 +617,14 @@ export function ConteoTab({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs font-semibold">Observación / Estado</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">Observación / Estado (Automático)</Label>
+                      <span className="text-[10px] text-muted-foreground font-mono">Calculado</span>
+                    </div>
                     <select
                       value={form.observacion}
                       onChange={(e) => setForm((prev) => ({ ...prev, observacion: e.target.value }))}
-                      className="flex h-10 w-full mt-1 rounded-xl border border-input bg-background px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      className="flex h-10 w-full mt-1 rounded-xl border border-input bg-background px-3 py-2 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                     >
                       <option value="OK">OK (Coincide con sistema)</option>
                       <option value="SOBRANTE">SOBRANTE (Físico mayor)</option>
@@ -646,9 +676,9 @@ export function ConteoTab({
 
               {/* ACTION BUTTONS */}
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
-                <Button type="button" variant="outline" size="lg" onClick={clearForm} className="h-12 px-6 font-bold text-xs rounded-xl">
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Limpiar / Cancelar
+                <Button type="button" variant="outline" size="lg" onClick={clearForm} className="h-12 px-6 font-bold text-xs rounded-xl border-rose-500/30 text-rose-600 hover:bg-rose-500/10">
+                  <X className="mr-2 h-4 w-4" />
+                  Cancelar
                 </Button>
                 <Button type="submit" disabled={saving || !form.producto} size="lg" className="h-12 px-8 font-bold text-sm shadow-md rounded-xl">
                   {saving ? (

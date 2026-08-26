@@ -145,40 +145,25 @@ export default function UserListPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 w-full animate-in fade-in slide-in-from-bottom-4 duration-1000">
-      
-      {/* SECTION A: PAGE HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent uppercase">
-            User Management
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">
-            Manage your workspace members and their access levels.
-          </p>
+    <div className="flex flex-col gap-4 w-full animate-in fade-in duration-300">
+      {/* TOOLBAR */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative group w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Input 
+            placeholder="Buscar usuario o nombre..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 h-10 rounded-xl border-border/50 bg-secondary/20 focus-visible:ring-primary/20 transition-all text-xs"
+          />
         </div>
         
-        <div className="flex items-center gap-3">
-          <div className="relative group w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-            <Input 
-              placeholder="Search users..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-10 rounded-xl border-border/50 bg-secondary/20 focus-visible:ring-primary/20 transition-all"
-            />
-          </div>
-          
+        <div className="flex items-center gap-2">
           {selectedUsers.length > 0 && (
-            <Button variant="destructive" className="rounded-xl h-10 px-4 animate-in zoom-in-95 duration-200 font-bold text-xs">
-               Delete ({selectedUsers.length})
+            <Button variant="destructive" className="rounded-xl h-10 px-4 font-bold text-xs">
+               Suspender ({selectedUsers.length})
             </Button>
           )}
-
-          <Button variant="outline" className="rounded-xl border-border/50 h-10 gap-2 text-[10px] font-black uppercase tracking-widest px-4">
-             <Filter className="h-3.5 w-3.5" />
-             Filters
-          </Button>
         </div>
       </div>
 

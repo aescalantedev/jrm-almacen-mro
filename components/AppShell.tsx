@@ -7,6 +7,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppTopbar } from "@/components/layout/AppTopbar";
 import { Toaster } from "@/components/ui/sonner";
+import { MaintenanceScreen } from "@/components/system/MaintenanceScreen";
 
 import { useAuth } from "@/app/inventario/hooks/use-auth";
 import { Loader2 } from "lucide-react";
@@ -14,11 +15,55 @@ import { Loader2 } from "lucide-react";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isLoading: authLoading } = useAuth();
+  const [inMaintenance, setInMaintenance] = React.useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = React.useState<string | undefined>();
+
+  // Check maintenance mode on load and periodically
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch("/api/system/maintenance", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setInMaintenance(Boolean(data.inMaintenance));
+            if (data.message) {
+              setMaintenanceMessage(data.message);
+            }
+          }
+        }
+      } catch {
+        // network/restarting
+      }
+    };
+
+    checkMaintenance();
+    const interval = setInterval(checkMaintenance, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [pathname]);
 
   const isPublicPage =
     pathname.startsWith("/auth") ||
     pathname.startsWith("/error") ||
     pathname === "/"; // RootPage also does redirects
+
+  if (inMaintenance) {
+    return (
+      <>
+        <MaintenanceScreen
+          message={maintenanceMessage}
+          onResolved={() => setInMaintenance(false)}
+        />
+        <Toaster position="top-right" richColors closeButton />
+      </>
+    );
+  }
 
   if (authLoading && !isPublicPage) {
     return (

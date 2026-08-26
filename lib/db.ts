@@ -16,6 +16,31 @@ export function getDB(): Database.Database {
 }
 
 function initSchema(db: Database.Database) {
+  try {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'usuarios'").get() as { sql: string } | undefined;
+    if (tableInfo && tableInfo.sql && (!tableInfo.sql.includes("'almacenero'") || !tableInfo.sql.includes("'auditor'"))) {
+      db.pragma('foreign_keys = OFF');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS usuarios_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nombre TEXT NOT NULL,
+          usuario TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          rol TEXT NOT NULL CHECK(rol IN ('contador', 'admin', 'almacenero', 'auditor')),
+          activo INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now', '-5 hours'))
+        );
+        INSERT INTO usuarios_new (id, nombre, usuario, password_hash, rol, activo, created_at)
+        SELECT id, nombre, usuario, password_hash, rol, activo, created_at FROM usuarios;
+        DROP TABLE usuarios;
+        ALTER TABLE usuarios_new RENAME TO usuarios;
+      `);
+      db.pragma('foreign_keys = ON');
+    }
+  } catch (err) {
+    console.error('Error auto-migrating usuarios table:', err);
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS usuarios (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,6 +129,28 @@ function initSchema(db: Database.Database) {
       estado TEXT DEFAULT 'ok',
       detalle TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS movimientos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo TEXT NOT NULL CHECK(tipo IN ('INGRESO', 'SALIDA', 'AJUSTE')),
+      producto TEXT NOT NULL,
+      lote TEXT DEFAULT '',
+      cantidad REAL NOT NULL,
+      stock_anterior REAL DEFAULT 0,
+      stock_resultante REAL DEFAULT 0,
+      motivo TEXT NOT NULL,
+      documento_referencia TEXT DEFAULT '',
+      solicitante TEXT DEFAULT '',
+      ubicacion_origen TEXT DEFAULT '',
+      ubicacion_destino TEXT DEFAULT '',
+      rack TEXT DEFAULT '',
+      foto_path TEXT,
+      comentario TEXT DEFAULT '',
+      usuario_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      FOREIGN KEY (producto) REFERENCES productos_master(producto),
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+    );
   `);
 
   ensureIndexes(db);
@@ -117,6 +164,9 @@ function ensureIndexes(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_inventario_producto ON inventario(producto);
     CREATE INDEX IF NOT EXISTS idx_inventario_usuario ON inventario(usuario_id);
     CREATE INDEX IF NOT EXISTS idx_inventario_lote ON inventario(lote);
+    CREATE INDEX IF NOT EXISTS idx_movimientos_producto ON movimientos(producto);
+    CREATE INDEX IF NOT EXISTS idx_movimientos_tipo ON movimientos(tipo);
+    CREATE INDEX IF NOT EXISTS idx_movimientos_created ON movimientos(created_at);
   `);
 }
 

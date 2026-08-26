@@ -7,10 +7,20 @@ export async function GET() {
     const db = getDB();
     const rows = db.prepare(`
       SELECT i.*, p.glosa as descripcion, p.unidad, p.familia, p.peso as peso_aprox_unitario,
-             p.costo_unitario, s.stock as stock_sistema
+             p.costo_unitario,
+             (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
+             COALESCE(m.total_ingresos, 0) as total_ingresos,
+             COALESCE(m.total_salidas, 0) as total_salidas
       FROM inventario i
       JOIN productos_master p ON i.producto = p.producto
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND i.lote = s.lote
+      LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
+      LEFT JOIN (
+        SELECT producto, IFNULL(lote, '') as m_lote,
+               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
+               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
+        FROM movimientos
+        GROUP BY producto, IFNULL(lote, '')
+      ) m ON i.producto = m.producto AND IFNULL(i.lote, '') = m.m_lote
       ORDER BY i.id ASC
     `).all() as Record<string, unknown>[];
 
@@ -178,8 +188,18 @@ export async function GET() {
     `).get() as { v: number };
 
     const valorSistemaRow = db.prepare(`
-      SELECT COALESCE(SUM(s.stock * p.costo_unitario), 0) as v
-      FROM stock_cache s JOIN productos_master p ON s.producto = p.producto
+      SELECT COALESCE(SUM(
+        (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario
+      ), 0) as v
+      FROM stock_cache s
+      JOIN productos_master p ON s.producto = p.producto
+      LEFT JOIN (
+        SELECT producto, IFNULL(lote, '') as m_lote,
+               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
+               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
+        FROM movimientos
+        GROUP BY producto, IFNULL(lote, '')
+      ) m ON s.producto = m.producto AND IFNULL(s.lote, '') = m.m_lote
     `).get() as { v: number };
 
     const valorFisico = valorFisicoRow.v;
@@ -207,12 +227,21 @@ export async function GET() {
     // ABC: Clasificar por valor de sistema (stock × costo)
     const inventarioRows = db.prepare(`
       SELECT i.producto, p.glosa as descripcion, p.familia,
-             s.stock as stock_sistema, i.cantidad_fisica, i.dif,
+             (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
+             i.cantidad_fisica,
+             i.dif,
              p.costo_unitario,
-             (COALESCE(s.stock, 0) * p.costo_unitario) as valor_sistema
+             ((COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario) as valor_sistema
       FROM inventario i
       JOIN productos_master p ON i.producto = p.producto
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND i.lote = s.lote
+      LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
+      LEFT JOIN (
+        SELECT producto, IFNULL(lote, '') as m_lote,
+               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
+               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
+        FROM movimientos
+        GROUP BY producto, IFNULL(lote, '')
+      ) m ON i.producto = m.producto AND IFNULL(i.lote, '') = m.m_lote
     `).all() as Record<string, unknown>[];
 
     // Calcular valor total para umbrales ABC
@@ -602,6 +631,433 @@ export async function GET() {
     footerCell.font = { italic: true, color: { argb: 'FF94A3B8' }, size: 9, name: 'Segoe UI' };
     footerCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     wsIRA.getRow(currentRow).height = 20;
+
+    // =========================================================================
+    // ── HOJA 3: RESUMEN DE MOVIMIENTOS Y ROTACIÓN (DASHBOARD EJECUTIVO) ──
+    // =========================================================================
+    const wsResumen = workbook.addWorksheet('Resumen Movimientos', {
+      views: [{ showGridLines: true }],
+    });
+
+    wsResumen.columns = [
+      { width: 5 },   // A
+      { width: 32 },  // B
+      { width: 38 },  // C
+      { width: 14 },  // D
+      { width: 18 },  // E
+      { width: 16 },  // F
+      { width: 18 },  // G
+    ];
+
+    let rowM = 1;
+
+    // Header Institucional
+    wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+    const rTitle = wsResumen.getCell(`B${rowM}`);
+    rTitle.value = 'ALM MRO CHILCA — RESUMEN EJECUTIVO DE MOVIMIENTOS Y ROTACIÓN';
+    rTitle.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 13, name: 'Segoe UI' };
+    rTitle.fill = HEADER_FILL;
+    rTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+    wsResumen.getRow(rowM).height = 36;
+    rowM++;
+
+    // Subtitle
+    wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+    const rSub = wsResumen.getCell(`B${rowM}`);
+    rSub.value = `Generado el: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}  |  Control de Entradas, Salidas y Rotación de Repuestos`;
+    rSub.font = { italic: true, color: { argb: 'FF475569' }, size: 9, name: 'Segoe UI' };
+    rSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    rSub.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsResumen.getRow(rowM).height = 20;
+    rowM += 2;
+
+    // Consultas de movimientos
+    const movStats = db.prepare(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN 1 ELSE 0 END), 0) as ingresos_count,
+        COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN 1 ELSE 0 END), 0) as salidas_count,
+        COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END), 0) as total_unidades_ingresadas,
+        COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END), 0) as total_unidades_salidas,
+        COUNT(*) as total_movimientos
+      FROM movimientos
+    `).get() as {
+      ingresos_count: number;
+      salidas_count: number;
+      total_unidades_ingresadas: number;
+      total_unidades_salidas: number;
+      total_movimientos: number;
+    };
+
+    const motivosData = db.prepare(`
+      SELECT motivo, COUNT(*) as count, COALESCE(SUM(cantidad), 0) as total_unidades
+      FROM movimientos
+      WHERE tipo = 'SALIDA'
+      GROUP BY motivo
+      ORDER BY total_unidades DESC
+    `).all() as { motivo: string; count: number; total_unidades: number }[];
+
+    const topRotacion = db.prepare(`
+      SELECT m.producto, p.glosa as descripcion, p.unidad, COALESCE(SUM(m.cantidad), 0) as total_despachado, COUNT(*) as despachos
+      FROM movimientos m
+      JOIN productos_master p ON m.producto = p.producto
+      WHERE m.tipo = 'SALIDA'
+      GROUP BY m.producto
+      ORDER BY total_despachado DESC
+      LIMIT 15
+    `).all() as { producto: string; descripcion: string; unidad: string; total_despachado: number; despachos: number }[];
+
+    const topSolicitantes = db.prepare(`
+      SELECT CASE WHEN solicitante = '' THEN 'Sin especificar' ELSE solicitante END as solicitante,
+             COUNT(*) as despachos, COALESCE(SUM(cantidad), 0) as total_unidades
+      FROM movimientos
+      WHERE tipo = 'SALIDA'
+      GROUP BY solicitante
+      ORDER BY despachos DESC
+      LIMIT 10
+    `).all() as { solicitante: string; despachos: number; total_unidades: number }[];
+
+    // ── SECCIÓN 1: KPIs GENERALES DE MOVIMIENTOS ──
+    wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+    const secMov1 = wsResumen.getCell(`B${rowM}`);
+    secMov1.value = '1. Indicadores Generales de Movimientos';
+    secMov1.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Segoe UI' };
+    secMov1.fill = HEADER_FILL;
+    secMov1.alignment = { vertical: 'middle', horizontal: 'left' };
+    wsResumen.getRow(rowM).height = 26;
+    rowM++;
+
+    const kpiMovHeaders = ['INDICADOR', 'VALOR', 'UNIDADES', 'ESTADO / NOTA'];
+    wsResumen.mergeCells(`B${rowM}:C${rowM}`);
+    wsResumen.getCell(`B${rowM}`).value = 'INDICADOR';
+    wsResumen.getCell(`D${rowM}`).value = 'TRANSACCIONES';
+    wsResumen.getCell(`E${rowM}`).value = 'CANTIDAD TOTAL';
+    wsResumen.mergeCells(`F${rowM}:G${rowM}`);
+    wsResumen.getCell(`F${rowM}`).value = 'BALANCE / IMPACTO';
+
+    ['B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+      const c = wsResumen.getCell(`${col}${rowM}`);
+      c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9, name: 'Segoe UI' };
+      c.fill = ACCENT_FILL;
+      c.alignment = { vertical: 'middle', horizontal: 'center' };
+      c.border = BORDER_THIN;
+    });
+    wsResumen.getRow(rowM).height = 22;
+    rowM++;
+
+    const kpiMovRows = [
+      {
+        nombre: 'Total Ingresos a Almacén (+)',
+        trans: movStats.ingresos_count,
+        unidades: movStats.total_unidades_ingresadas,
+        nota: 'Compras y devoluciones recepcionadas',
+        color: 'FF059669',
+      },
+      {
+        nombre: 'Total Despachos / Salidas (-)',
+        trans: movStats.salidas_count,
+        unidades: movStats.total_unidades_salidas,
+        nota: 'Órdenes de trabajo y consumo de planta',
+        color: 'FFE11D48',
+      },
+      {
+        nombre: 'Balance Neto de Movimientos',
+        trans: movStats.total_movimientos,
+        unidades: movStats.total_unidades_ingresadas - movStats.total_unidades_salidas,
+        nota: movStats.total_unidades_ingresadas - movStats.total_unidades_salidas >= 0 ? 'Flujo Positivo (+)' : 'Consumo Mayor a Ingresos (-)',
+        color: movStats.total_unidades_ingresadas - movStats.total_unidades_salidas >= 0 ? 'FF059669' : 'FFE11D48',
+      },
+    ];
+
+    kpiMovRows.forEach(kpi => {
+      wsResumen.mergeCells(`B${rowM}:C${rowM}`);
+      wsResumen.getCell(`B${rowM}`).value = kpi.nombre;
+      wsResumen.getCell(`B${rowM}`).font = { bold: true, size: 10, name: 'Segoe UI' };
+      wsResumen.getCell(`B${rowM}`).alignment = { vertical: 'middle', horizontal: 'left' };
+
+      wsResumen.getCell(`D${rowM}`).value = kpi.trans;
+      wsResumen.getCell(`D${rowM}`).numFmt = '#,##0';
+      wsResumen.getCell(`D${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+
+      wsResumen.getCell(`E${rowM}`).value = kpi.unidades;
+      wsResumen.getCell(`E${rowM}`).numFmt = '#,##0.00';
+      wsResumen.getCell(`E${rowM}`).font = { bold: true, color: { argb: kpi.color }, size: 10, name: 'Segoe UI' };
+      wsResumen.getCell(`E${rowM}`).alignment = { vertical: 'middle', horizontal: 'right' };
+
+      wsResumen.mergeCells(`F${rowM}:G${rowM}`);
+      wsResumen.getCell(`F${rowM}`).value = kpi.nota;
+      wsResumen.getCell(`F${rowM}`).alignment = { vertical: 'middle', horizontal: 'left' };
+
+      ['B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+        wsResumen.getCell(`${col}${rowM}`).border = BORDER_THIN;
+      });
+      wsResumen.getRow(rowM).height = 22;
+      rowM++;
+    });
+    rowM += 2;
+
+    // ── SECCIÓN 2: MOTIVOS DE SALIDA ──
+    wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+    const secMov2 = wsResumen.getCell(`B${rowM}`);
+    secMov2.value = '2. Distribución de Salidas por Motivo';
+    secMov2.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Segoe UI' };
+    secMov2.fill = HEADER_FILL;
+    secMov2.alignment = { vertical: 'middle', horizontal: 'left' };
+    wsResumen.getRow(rowM).height = 26;
+    rowM++;
+
+    wsResumen.mergeCells(`B${rowM}:D${rowM}`);
+    wsResumen.getCell(`B${rowM}`).value = 'MOTIVO DE SALIDA';
+    wsResumen.getCell(`E${rowM}`).value = 'N° DESPACHOS';
+    wsResumen.getCell(`F${rowM}`).value = 'CANTIDAD TOTAL';
+    wsResumen.getCell(`G${rowM}`).value = '% PARTICIPACIÓN';
+
+    ['B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+      const c = wsResumen.getCell(`${col}${rowM}`);
+      c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9, name: 'Segoe UI' };
+      c.fill = ACCENT_FILL;
+      c.alignment = { vertical: 'middle', horizontal: 'center' };
+      c.border = BORDER_THIN;
+    });
+    wsResumen.getRow(rowM).height = 22;
+    rowM++;
+
+    const totalSalidasCant = movStats.total_unidades_salidas || 1;
+
+    if (motivosData.length === 0) {
+      wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+      wsResumen.getCell(`B${rowM}`).value = 'Aún no se registran movimientos de salida.';
+      wsResumen.getCell(`B${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      wsResumen.getCell(`B${rowM}`).font = { italic: true, size: 9.5, color: { argb: 'FF94A3B8' } };
+      wsResumen.getRow(rowM).height = 22;
+      rowM++;
+    } else {
+      motivosData.forEach(mot => {
+        wsResumen.mergeCells(`B${rowM}:D${rowM}`);
+        wsResumen.getCell(`B${rowM}`).value = mot.motivo;
+        wsResumen.getCell(`B${rowM}`).font = { size: 9.5, name: 'Segoe UI' };
+        wsResumen.getCell(`B${rowM}`).alignment = { vertical: 'middle', horizontal: 'left' };
+
+        wsResumen.getCell(`E${rowM}`).value = mot.count;
+        wsResumen.getCell(`E${rowM}`).numFmt = '#,##0';
+        wsResumen.getCell(`E${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        wsResumen.getCell(`F${rowM}`).value = mot.total_unidades;
+        wsResumen.getCell(`F${rowM}`).numFmt = '#,##0.00';
+        wsResumen.getCell(`F${rowM}`).alignment = { vertical: 'middle', horizontal: 'right' };
+
+        const pct = ((mot.total_unidades / totalSalidasCant) * 100).toFixed(1);
+        wsResumen.getCell(`G${rowM}`).value = `${pct}%`;
+        wsResumen.getCell(`G${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        ['B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+          wsResumen.getCell(`${col}${rowM}`).border = BORDER_THIN;
+        });
+        wsResumen.getRow(rowM).height = 20;
+        rowM++;
+      });
+    }
+    rowM += 2;
+
+    // ── SECCIÓN 3: TOP 15 REPUESTOS CON MAYOR ROTACIÓN ──
+    wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+    const secMov3 = wsResumen.getCell(`B${rowM}`);
+    secMov3.value = '3. Top 15 Repuestos con Mayor Rotación (Salidas)';
+    secMov3.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Segoe UI' };
+    secMov3.fill = HEADER_FILL;
+    secMov3.alignment = { vertical: 'middle', horizontal: 'left' };
+    wsResumen.getRow(rowM).height = 26;
+    rowM++;
+
+    wsResumen.getCell(`B${rowM}`).value = 'CÓDIGO SKU';
+    wsResumen.getCell(`C${rowM}`).value = 'DESCRIPCIÓN DEL MATERIAL';
+    wsResumen.getCell(`D${rowM}`).value = 'UM';
+    wsResumen.getCell(`E${rowM}`).value = 'DESPACHOS';
+    wsResumen.mergeCells(`F${rowM}:G${rowM}`);
+    wsResumen.getCell(`F${rowM}`).value = 'TOTAL DESPACHADO';
+
+    ['B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+      const c = wsResumen.getCell(`${col}${rowM}`);
+      c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9, name: 'Segoe UI' };
+      c.fill = ACCENT_FILL;
+      c.alignment = { vertical: 'middle', horizontal: 'center' };
+      c.border = BORDER_THIN;
+    });
+    wsResumen.getRow(rowM).height = 22;
+    rowM++;
+
+    if (topRotacion.length === 0) {
+      wsResumen.mergeCells(`B${rowM}:G${rowM}`);
+      wsResumen.getCell(`B${rowM}`).value = 'Sin datos de rotación.';
+      wsResumen.getCell(`B${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+      wsResumen.getRow(rowM).height = 22;
+      rowM++;
+    } else {
+      topRotacion.forEach(item => {
+        wsResumen.getCell(`B${rowM}`).value = item.producto;
+        wsResumen.getCell(`B${rowM}`).font = { name: 'Consolas', size: 9.5, bold: true };
+
+        wsResumen.getCell(`C${rowM}`).value = item.descripcion;
+        wsResumen.getCell(`C${rowM}`).font = { size: 9.5, name: 'Segoe UI' };
+
+        wsResumen.getCell(`D${rowM}`).value = item.unidad;
+        wsResumen.getCell(`D${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        wsResumen.getCell(`E${rowM}`).value = item.despachos;
+        wsResumen.getCell(`E${rowM}`).numFmt = '#,##0';
+        wsResumen.getCell(`E${rowM}`).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        wsResumen.mergeCells(`F${rowM}:G${rowM}`);
+        wsResumen.getCell(`F${rowM}`).value = item.total_despachado;
+        wsResumen.getCell(`F${rowM}`).numFmt = '#,##0.00';
+        wsResumen.getCell(`F${rowM}`).font = { bold: true, color: { argb: 'FFE11D48' } };
+        wsResumen.getCell(`F${rowM}`).alignment = { vertical: 'middle', horizontal: 'right' };
+
+        ['B', 'C', 'D', 'E', 'F', 'G'].forEach(col => {
+          wsResumen.getCell(`${col}${rowM}`).border = BORDER_THIN;
+        });
+        wsResumen.getRow(rowM).height = 20;
+        rowM++;
+      });
+    }
+
+    // =========================================================================
+    // ── HOJA 4: KARDEX DETALLADO (LÍNEA POR LÍNEA) ──
+    // =========================================================================
+    const wsKardex = workbook.addWorksheet('Kardex Detallado', {
+      views: [{ state: 'frozen', ySplit: 3, showGridLines: true }],
+    });
+
+    // 1. Título
+    wsKardex.mergeCells('A1:O1');
+    const kTitle = wsKardex.getCell('A1');
+    kTitle.value = 'MRO INVENTARIO — KARDEX DE MOVIMIENTOS DETALLADO';
+    kTitle.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 13, name: 'Segoe UI' };
+    kTitle.fill = HEADER_FILL;
+    kTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+    wsKardex.getRow(1).height = 34;
+
+    wsKardex.mergeCells('A2:O2');
+    const kMeta = wsKardex.getCell('A2');
+    kMeta.value = `Generado el: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}  |  Auditoría y Trazabilidad de Entradas y Salidas`;
+    kMeta.font = { italic: true, color: { argb: 'FF475569' }, size: 9, name: 'Segoe UI' };
+    kMeta.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    kMeta.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    wsKardex.getRow(2).height = 20;
+
+    // 2. Cabeceras
+    const kardexHeaders = [
+      { header: 'ID', width: 8 },
+      { header: 'FECHA / HORA', width: 19 },
+      { header: 'TIPO', width: 14 },
+      { header: 'SKU / CÓDIGO', width: 16 },
+      { header: 'DESCRIPCIÓN DEL MATERIAL', width: 38 },
+      { header: 'UM', width: 8 },
+      { header: 'LOTE', width: 12 },
+      { header: 'CANTIDAD', width: 14 },
+      { header: 'STOCK ANTERIOR', width: 16 },
+      { header: 'STOCK RESULTANTE', width: 18 },
+      { header: 'MOTIVO DEL MOVIMIENTO', width: 30 },
+      { header: 'N° DOC / GUÍA / OT', width: 22 },
+      { header: 'SOLICITANTE / PROVEEDOR', width: 25 },
+      { header: 'RACK / UBICACIÓN', width: 16 },
+      { header: 'REGISTRADO POR', width: 18 },
+    ];
+
+    const kHeadRow = wsKardex.getRow(3);
+    kHeadRow.height = 26;
+    kardexHeaders.forEach((kh, i) => {
+      const cell = kHeadRow.getCell(i + 1);
+      cell.value = kh.header;
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9.5, name: 'Segoe UI' };
+      cell.fill = ACCENT_FILL;
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = BORDER_THIN;
+      wsKardex.getColumn(i + 1).width = kh.width;
+    });
+
+    const kardexRows = db.prepare(`
+      SELECT m.id, m.created_at, m.tipo, m.producto, p.glosa as descripcion, p.unidad, m.lote,
+             m.cantidad, m.stock_anterior, m.stock_resultante, m.motivo, m.documento_referencia,
+             m.solicitante, m.rack, u.nombre as usuario_nombre
+      FROM movimientos m
+      JOIN productos_master p ON m.producto = p.producto
+      LEFT JOIN usuarios u ON m.usuario_id = u.id
+      ORDER BY m.created_at DESC, m.id DESC
+    `).all() as {
+      id: number;
+      created_at: string;
+      tipo: string;
+      producto: string;
+      descripcion: string;
+      unidad: string;
+      lote: string;
+      cantidad: number;
+      stock_anterior: number;
+      stock_resultante: number;
+      motivo: string;
+      documento_referencia: string;
+      solicitante: string;
+      rack: string;
+      usuario_nombre: string;
+    }[];
+
+    kardexRows.forEach((kr, idx) => {
+      const rNum = 4 + idx;
+      const r = wsKardex.getRow(rNum);
+      r.height = 22;
+      const isEven = idx % 2 === 0;
+
+      r.values = [
+        kr.id,
+        kr.created_at,
+        kr.tipo,
+        kr.producto,
+        kr.descripcion,
+        kr.unidad || 'UND',
+        kr.lote || '-',
+        kr.cantidad,
+        kr.stock_anterior,
+        kr.stock_resultante,
+        kr.motivo,
+        kr.documento_referencia || '-',
+        kr.solicitante || '-',
+        kr.rack || '-',
+        kr.usuario_nombre || 'Sistema',
+      ];
+
+      for (let c = 1; c <= 15; c++) {
+        const cell = r.getCell(c);
+        cell.border = BORDER_THIN;
+        cell.font = { size: 9.5, name: 'Segoe UI' };
+        cell.alignment = { vertical: 'middle' };
+
+        if (!isEven) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        }
+
+        if (c === 1 || c === 2 || c === 6 || c === 7) {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (c === 3) {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          if (kr.tipo === 'INGRESO') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+            cell.font = { bold: true, color: { argb: 'FF166534' }, size: 9.5 };
+          } else if (kr.tipo === 'SALIDA') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+            cell.font = { bold: true, color: { argb: 'FF991B1B' }, size: 9.5 };
+          }
+        } else if (c === 4) {
+          cell.font = { name: 'Consolas', size: 9.5, bold: true };
+        } else if (c === 8) {
+          cell.numFmt = '#,##0.00';
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          cell.font = { bold: true, size: 10 };
+        } else if (c === 9 || c === 10) {
+          cell.numFmt = '#,##0.00';
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+        }
+      }
+    });
 
     const buffer = await workbook.xlsx.writeBuffer();
     const filename = `Inventario_MRO_CHILCA_${new Date().toLocaleDateString("sv-SE")}.xlsx`;

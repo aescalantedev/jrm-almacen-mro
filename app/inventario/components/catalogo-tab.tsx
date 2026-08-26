@@ -92,7 +92,7 @@ export function CatalogoTab({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={catalogSearch}
-              onChange={(e) => setCatalogSearch(e.target.value)}
+              onChange={(e) => setCatalogSearch(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === "Enter" && loadCatalog(catalogSearch, pendingFilter)}
               placeholder="Buscar en catálogo por código SKU, descripción o lote..."
               className="pl-9 h-10 text-xs rounded-xl bg-secondary/30"
@@ -169,9 +169,20 @@ export function CatalogoTab({
               {catalogItems.map((item, i) => (
                 <div key={`${item.producto}-${item.lote}-${i}`} className="p-3.5 space-y-2 hover:bg-secondary/20 transition">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-xs bg-secondary px-2 py-0.5 rounded border border-border/50">
-                      {item.producto}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono font-bold text-xs bg-secondary px-2 py-0.5 rounded border border-border/50">
+                        {item.producto}
+                      </span>
+                      {item.ya_contado ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          ✓ Contado: {item.cantidad_fisica} {item.inventario_um || item.unidad}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md text-muted-foreground border border-border/40">
+                          Pendiente
+                        </span>
+                      )}
+                    </div>
                     <span className="font-mono font-bold text-xs text-primary">
                       Stock: {item.stock} {item.unidad}
                     </span>
@@ -187,11 +198,12 @@ export function CatalogoTab({
                     <Button
                       type="button"
                       size="sm"
+                      variant={item.ya_contado ? "secondary" : "default"}
                       onClick={() => onSelectStock(item)}
                       className="w-full h-9 text-xs font-bold gap-1.5 rounded-xl"
                     >
                       <Barcode className="h-3.5 w-3.5" />
-                      Contar este producto
+                      {item.ya_contado ? "Editar conteo registrado" : "Contar este producto"}
                     </Button>
                   </div>
                 </div>
@@ -207,6 +219,7 @@ export function CatalogoTab({
                     <th className="text-left py-3 px-4 font-bold text-muted-foreground uppercase tracking-wider">Descripción</th>
                     <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Lote</th>
                     <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Stock</th>
+                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Estado</th>
                     <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Familia</th>
                     <th className="text-center py-3 px-4 font-bold text-muted-foreground uppercase tracking-wider">Acción</th>
                   </tr>
@@ -222,16 +235,28 @@ export function CatalogoTab({
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-primary">
                         {item.stock} <span className="font-normal text-muted-foreground text-[10px]">{item.unidad}</span>
                       </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {item.ya_contado ? (
+                          <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                            ✓ {item.cantidad_fisica} {item.inventario_um || item.unidad}
+                          </span>
+                        ) : (
+                          <span className="inline-block text-[10px] text-muted-foreground px-2 py-0.5 rounded-md border border-border/40 whitespace-nowrap">
+                            Pendiente
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3 text-center text-[11px] text-muted-foreground">{item.familia || "-"}</td>
                       <td className="py-2.5 px-4 text-center">
                         <Button
                           type="button"
                           size="sm"
+                          variant={item.ya_contado ? "secondary" : "default"}
                           onClick={() => onSelectStock(item)}
                           className="h-8 text-xs font-bold gap-1 rounded-lg px-3"
                         >
                           <Barcode className="h-3.5 w-3.5 mr-1" />
-                          Contar
+                          {item.ya_contado ? "Editar" : "Contar"}
                         </Button>
                       </td>
                     </tr>

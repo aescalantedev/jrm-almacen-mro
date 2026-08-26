@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import {
   Package, CheckCircle2, XCircle, AlertTriangle, Clock,
   Users, BarChart3, DollarSign, RefreshCw, Loader2, Database,
-  TrendingUp, PieChart as PieIcon, FileSpreadsheet, Target
+  TrendingUp, PieChart as PieIcon, FileSpreadsheet, Target,
+  ArrowLeftRight
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { IRAContent } from "./components/ira-content";
+import { KardexAnalytics } from "./components/kardex-analytics";
 import { useAuth } from "../inventario/hooks/use-auth";
 
 interface DashboardStats {
@@ -95,7 +97,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "ira">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "ira" | "movimientos">("general");
 
   const { user, token, isLoading: authLoading } = useAuth();
 
@@ -217,17 +219,46 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="w-full space-y-6">
-      {/* Header Banner & Global Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2">
-            <Package className="h-7 w-7 text-primary" />
-            Dashboard de Inventario
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-            Métricas ejecutivas y control de existencias en tiempo real (ALM MRO CHILCA)
-          </p>
+    <div className="w-full space-y-5">
+      {/* Tab Navigation & Global Actions Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+        <div className="flex gap-1 bg-secondary/30 p-1 rounded-xl border border-border/40 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab("general")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "general"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            }`}
+          >
+            <Package className="h-3.5 w-3.5" />
+            General
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("ira")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "ira"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            }`}
+          >
+            <Target className="h-3.5 w-3.5" />
+            IRA
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("movimientos")}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === "movimientos"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            }`}
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            Movimientos
+          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -236,12 +267,12 @@ export default function DashboardPage() {
             variant="outline"
             onClick={handleExportExcel}
             disabled={exporting}
-            className="h-10 text-xs font-bold gap-2 rounded-xl border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+            className="h-9 text-xs font-bold gap-2 rounded-xl border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
           >
             {exporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <FileSpreadsheet className="h-4 w-4" />
+              <FileSpreadsheet className="h-3.5 w-3.5" />
             )}
             Exportar Excel (.xlsx)
           </Button>
@@ -250,49 +281,23 @@ export default function DashboardPage() {
             type="button"
             onClick={handleSync}
             disabled={syncing}
-            className="h-10 text-xs font-bold gap-2 rounded-xl shadow-sm"
+            className="h-9 text-xs font-bold gap-2 rounded-xl shadow-sm"
           >
             {syncing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-3.5 w-3.5" />
             )}
             {syncing ? "Sincronizando..." : "Sincronizar Stock"}
           </Button>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1 bg-secondary/30 p-1 rounded-xl border border-border/40 w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab("general")}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-            activeTab === "general"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-          }`}
-        >
-          <Package className="h-3.5 w-3.5" />
-          General
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("ira")}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-            activeTab === "ira"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-          }`}
-        >
-          <Target className="h-3.5 w-3.5" />
-          IRA
-        </button>
-      </div>
-
       {/* Tab Content */}
       {activeTab === "ira" ? (
         <IRAContent />
+      ) : activeTab === "movimientos" ? (
+        <KardexAnalytics token={token} />
       ) : (
         <>
       {/* KPI METRIC CARDS */}

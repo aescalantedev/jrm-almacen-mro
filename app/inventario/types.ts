@@ -8,6 +8,32 @@ export interface StockItem {
   familia: string;
   peso: number;
   ubicacion?: string;
+  inventario_id?: number;
+  cantidad_fisica?: number;
+  dif?: number;
+  inventario_um?: string;
+  presentacion?: string;
+  n_cajas_bultos?: string;
+  largo?: number;
+  ancho?: number;
+  alto?: number;
+  peso_total_cant_fisica?: number;
+  inventario_observacion?: string;
+  comentario?: string;
+  rack?: string;
+  ubicacion_actual?: string;
+  almacenamiento?: string;
+  contenedor?: string;
+  responsable?: string;
+  fecha_conteo?: string;
+  familia2?: string;
+  foto_path?: string;
+  usuario_id?: number;
+  inventario_updated_at?: string;
+  ya_contado?: number;
+  total_ingresos?: number;
+  total_salidas?: number;
+  stock_disponible?: number;
 }
 
 export interface InventarioItem {
@@ -63,14 +89,14 @@ export interface ConteoForm {
   unidad: string;
   familia: string;
   familia2: string;
-  cantidad_fisica: number;
+  cantidad_fisica: number | string;
   um: string;
   presentacion: string;
   n_cajas_bultos: string;
-  largo: number;
-  ancho: number;
-  alto: number;
-  peso_aprox_unitario: number;
+  largo: number | string;
+  ancho: number | string;
+  alto: number | string;
+  peso_aprox_unitario: number | string;
   observacion: string;
   comentario: string;
   rack: string;

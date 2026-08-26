@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Barcode,
   ClipboardList,
@@ -18,10 +19,12 @@ import { RegistrosTab } from "./components/registros-tab";
 import { CatalogoTab } from "./components/catalogo-tab";
 import { BottomNav } from "./components/bottom-nav";
 
-export default function InventarioPage() {
+function InventarioContent() {
   const { user, token } = useAuth();
   const isAndroid = useIsAndroid();
   const [activeTab, setActiveTab] = useState("conteo");
+  const searchParams = useSearchParams();
+  const skuParam = searchParams.get("sku");
 
   const {
     registros,
@@ -86,6 +89,24 @@ export default function InventarioPage() {
     }
   }, [activeTab, token, catalogItems.length, loadCatalog]);
 
+  // Si vino con ?sku=XYZ, selecciona el producto y limpia inmediatamente la URL
+  useEffect(() => {
+    if (skuParam && token) {
+      setActiveTab("conteo");
+      searchStock(skuParam.trim().toUpperCase(), true);
+      if (typeof window !== "undefined") {
+        window.history.replaceState({}, "", "/inventario");
+      }
+    }
+  }, [skuParam, token, searchStock]);
+
+  const handleClearWithUrlReset = () => {
+    clearForm();
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", "/inventario");
+    }
+  };
+
   if (!user) return null;
 
   const tabContent = (
@@ -106,7 +127,7 @@ export default function InventarioPage() {
           dif={dif}
           pesoTotal={pesoTotal}
           updateQuantity={updateQuantity}
-          clearForm={clearForm}
+          clearForm={handleClearWithUrlReset}
           searchStock={searchStock}
           selectStock={selectStock}
           handleSave={handleSave}
@@ -208,5 +229,13 @@ export default function InventarioPage() {
         {tabContent}
       </Tabs>
     </div>
+  );
+}
+
+export default function InventarioPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Cargando inventario...</div>}>
+      <InventarioContent />
+    </Suspense>
   );
 }

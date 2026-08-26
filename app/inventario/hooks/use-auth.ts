@@ -25,11 +25,16 @@ export function useAuth() {
     if (!auth.user || !auth.token) {
       const isPublic = window.location.pathname.startsWith('/auth');
       if (!isPublic) {
-        window.location.href = "/auth/login";
+        window.location.replace("/auth/login");
       } else {
         setIsLoading(false);
       }
     } else {
+      const isAuthPage = window.location.pathname.startsWith('/auth');
+      if (isAuthPage) {
+        window.location.replace("/inventario");
+        return;
+      }
       setUser(auth.user);
       setToken(auth.token);
       setIsLoading(false);
@@ -37,7 +42,7 @@ export function useAuth() {
   }, []);
   const logout = () => {
     localStorage.removeItem("mro_auth");
-    window.location.href = "/auth/login";
+    window.location.replace("/auth/login");
   };
 
   return { user, setUser, token, setToken, isLoading, logout };
