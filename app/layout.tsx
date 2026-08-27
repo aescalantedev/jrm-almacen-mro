@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/AppShell";
@@ -27,13 +28,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const colorTheme = cookieStore.get("strix-color-theme")?.value || "";
+
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" data-color-theme={colorTheme || undefined} suppressHydrationWarning>
       <body className={`${fontSans.variable} font-sans antialiased selection:bg-primary/10 selection:text-primary min-h-screen bg-background`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AppShell>{children}</AppShell>

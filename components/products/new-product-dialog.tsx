@@ -224,7 +224,7 @@ export function NewProductDialog({
                 >
                   {catalogs.bodegas.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.codigo} - {b.nombre}
+                      {b.nombre}
                     </option>
                   ))}
                 </select>

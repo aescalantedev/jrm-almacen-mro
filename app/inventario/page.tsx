@@ -174,60 +174,60 @@ function InventarioContent() {
     </>
   );
 
-  if (isAndroid) {
-    return (
-      <div className="w-full space-y-4 pb-20">
-        <div className="visible md:hidden">
+  return (
+    <div className="w-full space-y-4">
+      {/* Vista Desktop / Tablet (> md) o no Android */}
+      <div className={isAndroid ? "hidden md:block" : "block"}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-3 w-full h-12 p-1 bg-secondary/40 rounded-xl">
+            <TabsTrigger
+              value="conteo"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold rounded-lg data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all"
+            >
+              <Barcode className="h-4 w-4" />
+              <span>Registrar Conteo</span>
+              {isEditing && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="registros"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold rounded-lg data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all"
+            >
+              <ClipboardList className="h-4 w-4" />
+              <span>Mis Registros</span>
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] font-mono">
+                {totalRegistros}
+              </Badge>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="catalogo"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold rounded-lg data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all"
+            >
+              <Package className="h-4 w-4" />
+              <span className="hidden sm:inline">Explorar Stock</span>
+              <span className="sm:hidden">Catálogo</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {tabContent}
+        </Tabs>
+      </div>
+
+      {/* Vista Mobile Android (< md) */}
+      {isAndroid && (
+        <div className="block md:hidden pb-20">
           <Tabs value={activeTab} className="w-full">
             {tabContent}
           </Tabs>
+          <BottomNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            registrosCount={totalRegistros}
+            isEditing={!!isEditing}
+          />
         </div>
-        <BottomNav
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          registrosCount={totalRegistros}
-          isEditing={!!isEditing}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="w-full space-y-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 w-full h-12 p-1 bg-secondary/40 rounded-xl">
-          <TabsTrigger
-            value="conteo"
-            className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold rounded-lg data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all"
-          >
-            <Barcode className="h-4 w-4" />
-            <span>Registrar Conteo</span>
-            {isEditing && <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />}
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="registros"
-            className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold rounded-lg data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all"
-          >
-            <ClipboardList className="h-4 w-4" />
-            <span>Mis Registros</span>
-            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] font-mono">
-              {totalRegistros}
-            </Badge>
-          </TabsTrigger>
-
-          <TabsTrigger
-            value="catalogo"
-            className="flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold rounded-lg data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all"
-          >
-            <Package className="h-4 w-4" />
-            <span className="hidden sm:inline">Explorar Stock</span>
-            <span className="sm:hidden">Catálogo</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {tabContent}
-      </Tabs>
+      )}
     </div>
   );
 }

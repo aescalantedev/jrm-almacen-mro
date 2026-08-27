@@ -25,6 +25,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { TableLoadMore } from "@/components/ui/table-load-more";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -125,18 +132,18 @@ export default function KardexPage() {
   return (
     <div className="w-full min-w-0 space-y-4">
       {/* SUMMARY METRICS CARDS (FULL-WIDTH 4 COLUMNS) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
         <Card className="border-border/60 shadow-xs bg-emerald-500/5">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400">
               <span>Total Ingresos (+)</span>
               <ArrowDownCircle className="h-4 w-4" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-foreground">
+            <div className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-xl sm:text-2xl font-black font-mono text-foreground">
                 {stats.ingresos_count}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
                 ({stats.total_unidades_ingresadas.toLocaleString()} unds)
               </span>
             </div>
@@ -144,16 +151,16 @@ export default function KardexPage() {
         </Card>
 
         <Card className="border-border/60 shadow-xs bg-rose-500/5">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between text-xs font-semibold text-rose-600 dark:text-rose-400">
               <span>Total Salidas (-)</span>
               <ArrowUpCircle className="h-4 w-4" />
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-foreground">
+            <div className="mt-1.5 flex items-baseline gap-1.5">
+              <span className="text-xl sm:text-2xl font-black font-mono text-foreground">
                 {stats.salidas_count}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
                 ({stats.total_unidades_salidas.toLocaleString()} unds)
               </span>
             </div>
@@ -161,32 +168,33 @@ export default function KardexPage() {
         </Card>
 
         <Card className="border-border/60 shadow-xs bg-primary/5">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center justify-between text-xs font-semibold text-primary">
               <span>Movimientos Totales</span>
               <Package className="h-4 w-4" />
             </div>
-            <div className="mt-2">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-foreground">
+            <div className="mt-1.5">
+              <span className="text-xl sm:text-2xl font-black font-mono text-foreground">
                 {total}
               </span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 shadow-xs flex items-center justify-center p-3 bg-emerald-500/5">
+        <Card className="border-border/60 shadow-xs flex items-center justify-center p-2.5 bg-emerald-500/5">
           <Button
             type="button"
             onClick={handleExportExcel}
             disabled={exporting}
-            className="w-full h-full min-h-[56px] text-xs font-bold gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20"
+            className="w-full h-full min-h-[44px] text-xs font-bold gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
           >
             {exporting ? (
               <Loader2 className="animate-spin h-4 w-4" />
             ) : (
               <FileSpreadsheet className="h-4 w-4" />
             )}
-            Exportar a Excel (.xlsx)
+            <span className="hidden sm:inline">Exportar a Excel</span>
+            <span className="sm:hidden">Exportar</span>
           </Button>
         </Card>
       </div>
@@ -222,18 +230,22 @@ export default function KardexPage() {
             </div>
 
             {/* Tipo */}
-            <select
-              value={filters.tipo}
-              onChange={(e) =>
-                setFilters((prev) => ({ ...prev, tipo: e.target.value, page: 1 }))
+            <Select
+              value={filters.tipo || "ALL"}
+              onValueChange={(val) =>
+                setFilters((prev) => ({ ...prev, tipo: val === "ALL" ? "" : val, page: 1 }))
               }
-              className="h-10 px-3 text-xs rounded-xl bg-background border border-input focus:ring-2 focus:ring-primary/40"
             >
-              <option value="">Todos los Tipos (Ingresos y Salidas)</option>
-              <option value="INGRESO">Solo Ingresos (+)</option>
-              <option value="SALIDA">Solo Salidas (-)</option>
-              <option value="AJUSTE">Solo Ajustes (≡)</option>
-            </select>
+              <SelectTrigger className="h-10 px-3 text-xs rounded-xl bg-background border border-input focus:ring-2 focus:ring-primary/40">
+                <SelectValue placeholder="Todos los Tipos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todos los Tipos (Ingresos y Salidas)</SelectItem>
+                <SelectItem value="INGRESO">Solo Ingresos (+)</SelectItem>
+                <SelectItem value="SALIDA">Solo Salidas (-)</SelectItem>
+                <SelectItem value="AJUSTE">Solo Ajustes (≡)</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Fecha Desde */}
             <div>
