@@ -71,8 +71,10 @@ export function KardexAnalytics({ token }: { token: string }) {
   const loadStats = useCallback(async () => {
     setLoading(true);
     try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("mro_auth") : null;
+      const currentToken = token || (raw ? JSON.parse(raw).token : "");
       const res = await fetch("/api/movimientos/stats", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {},
       });
       const data = await res.json();
       if (res.ok) {

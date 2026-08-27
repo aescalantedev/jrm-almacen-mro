@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
+import { TableLoadMore } from "@/components/ui/table-load-more";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ export default function KardexPage() {
   const [movimientos, setMovimientos] = useState<MovimientoItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
@@ -57,8 +59,10 @@ export default function KardexPage() {
     limit: 50,
   });
 
-  const loadKardex = useCallback(async () => {
-    setLoading(true);
+  const loadKardex = useCallback(async (pageNum = 1, append = false) => {
+    if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
+
     try {
       const params = new URLSearchParams();
       if (filters.q) params.set("q", filters.q);
@@ -66,15 +70,19 @@ export default function KardexPage() {
       if (filters.motivo) params.set("motivo", filters.motivo);
       if (filters.desde) params.set("desde", filters.desde);
       if (filters.hasta) params.set("hasta", filters.hasta);
-      params.set("page", String(filters.page));
-      params.set("limit", String(filters.limit));
+      params.set("page", String(pageNum));
+      params.set("limit", "50");
 
       const res = await fetch(`/api/movimientos?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       if (res.ok) {
-        setMovimientos(data.movimientos || []);
+        if (append) {
+          setMovimientos((prev) => [...prev, ...(data.movimientos || [])]);
+        } else {
+          setMovimientos(data.movimientos || []);
+        }
         setTotal(data.total || 0);
         if (data.stats) setStats(data.stats);
       }
@@ -82,12 +90,20 @@ export default function KardexPage() {
       // error handling
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [filters, token]);
+  }, [filters.q, filters.tipo, filters.motivo, filters.desde, filters.hasta, token]);
 
   useEffect(() => {
-    loadKardex();
+    setFilters((prev) => ({ ...prev, page: 1 }));
+    loadKardex(1, false);
   }, [loadKardex]);
+
+  const handleLoadMore = () => {
+    const nextPage = filters.page + 1;
+    setFilters((prev) => ({ ...prev, page: nextPage }));
+    loadKardex(nextPage, true);
+  };
 
   const handleExportExcel = async () => {
     setExporting(true);
@@ -247,168 +263,182 @@ export default function KardexPage() {
       </Card>
 
       {/* TABLA DE AUDITORÍA FULL-WIDTH */}
+      {/* TABLA PRINCIPAL DEL KARDEX ESTANDARIZADA */}
       <Card className="border-border/60 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="bg-secondary/40 border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                <th className="p-3.5">Fecha / Hora</th>
-                <th className="p-3.5">Tipo</th>
-                <th className="p-3.5">SKU / Código</th>
-                <th className="p-3.5">Descripción del Material</th>
-                <th className="p-3.5">Motivo</th>
-                <th className="p-3.5 text-right">Cantidad</th>
-                <th className="p-3.5 text-right">Stock Ant.</th>
-                <th className="p-3.5 text-right">Stock Resultante</th>
-                <th className="p-3.5">Doc. Ref / Solicitante</th>
-                <th className="p-3.5">Registrado Por</th>
-                <th className="p-3.5 text-center">Foto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {loading ? (
-                <tr>
-                  <td colSpan={11} className="p-10 text-center text-muted-foreground">
-                    <Loader2 className="animate-spin h-6 w-6 mx-auto mb-2 text-primary" />
-                    Cargando movimientos del Kardex...
-                  </td>
-                </tr>
-              ) : movimientos.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="p-10 text-center text-muted-foreground">
-                    <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    No se encontraron transacciones con los filtros seleccionados.
-                  </td>
-                </tr>
-              ) : (
-                movimientos.map((m) => (
-                  <tr key={m.id} className="hover:bg-secondary/20 transition-colors">
-                    <td className="p-3.5 whitespace-nowrap font-mono text-[11px] text-muted-foreground">
-                      {m.created_at}
-                    </td>
-
-                    <td className="p-3.5 whitespace-nowrap">
-                      <Badge
-                        variant={m.tipo === "SALIDA" ? "destructive" : "default"}
-                        className={`text-[10px] py-0.5 px-2 font-bold ${
-                          m.tipo === "INGRESO"
-                            ? "bg-emerald-600 text-white"
-                            : m.tipo === "SALIDA"
-                              ? "bg-rose-500 text-white"
-                              : "bg-primary text-primary-foreground"
-                        }`}
-                      >
-                        {m.tipo === "INGRESO" ? "📥 INGRESO" : m.tipo === "SALIDA" ? "📤 SALIDA" : "⚖️ AJUSTE"}
-                      </Badge>
-                    </td>
-
-                    <td className="p-3.5 whitespace-nowrap font-mono font-bold text-foreground">
-                      {m.producto}
-                      {m.lote && (
-                        <span className="text-[10px] text-muted-foreground font-normal ml-1.5">
-                          ({m.lote})
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-3.5 min-w-[220px]">
-                      <span className="line-clamp-2 font-medium text-foreground">{m.descripcion}</span>
-                    </td>
-
-                    <td className="p-3.5 whitespace-nowrap font-medium text-foreground">
-                      {m.motivo}
-                    </td>
-
-                    <td className="p-3.5 text-right whitespace-nowrap font-mono font-black text-sm">
-                      <span
-                        className={
-                          m.tipo === "INGRESO"
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-rose-600 dark:text-rose-400"
-                        }
-                      >
-                        {m.tipo === "INGRESO" ? `+${m.cantidad}` : `-${m.cantidad}`}
-                      </span>{" "}
-                      <span className="text-[10px] font-normal text-muted-foreground">
-                        {m.unidad || "UND"}
-                      </span>
-                    </td>
-
-                    <td className="p-3.5 text-right whitespace-nowrap font-mono text-muted-foreground">
-                      {m.stock_anterior}
-                    </td>
-
-                    <td className="p-3.5 text-right whitespace-nowrap font-mono font-black text-foreground">
-                      {m.stock_resultante}
-                    </td>
-
-                    <td className="p-3.5 min-w-[160px]">
-                      {m.documento_referencia && (
-                        <div className="font-mono font-bold text-primary line-clamp-1">
-                          {m.documento_referencia}
-                        </div>
-                      )}
-                      {m.solicitante && (
-                        <div className="text-[11px] text-muted-foreground line-clamp-1">
-                          {m.solicitante}
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="p-3.5 whitespace-nowrap text-muted-foreground text-[11px]">
-                      {m.usuario_nombre || "Sistema"}
-                    </td>
-
-                    <td className="p-3.5 text-center whitespace-nowrap">
-                      {m.foto_path ? (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedPhoto(m.foto_path || null)}
-                          className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                          title="Ver Foto de Sustento / Guía"
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-[10px]">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {total > filters.limit && (
-          <div className="p-3.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              Mostrando {movimientos.length} de {total} registros (Página {filters.page} de {totalPages})
-            </span>
-            <div className="flex items-center gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={filters.page <= 1}
-                onClick={() => setFilters((p) => ({ ...p, page: p.page - 1 }))}
-                className="h-8 px-2.5 rounded-lg"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={filters.page >= totalPages}
-                onClick={() => setFilters((p) => ({ ...p, page: p.page + 1 }))}
-                className="h-8 px-2.5 rounded-lg"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 text-center text-muted-foreground">
+              <Loader2 className="animate-spin h-7 w-7 mx-auto mb-2 text-primary" />
+              <p className="text-xs font-semibold">Cargando movimientos del Kardex...</p>
             </div>
-          </div>
-        )}
+          ) : movimientos.length === 0 ? (
+            <div className="p-12 text-center space-y-2">
+              <Package className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+              <p className="text-sm font-semibold text-foreground">No se encontraron transacciones</p>
+              <p className="text-xs text-muted-foreground">Prueba ajustando el rango de fechas o los filtros</p>
+            </div>
+          ) : (
+            <>
+              {/* VISTA MÓVIL (CARDS INTERACTIVAS) */}
+              <div className="block sm:hidden divide-y divide-border/40">
+                {movimientos.map((m) => {
+                  const isIngreso = m.tipo === "INGRESO";
+                  return (
+                    <div key={m.id} className="p-3.5 space-y-2.5 hover:bg-secondary/20 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                            {m.producto}
+                          </span>
+                          <Badge
+                            className={`text-[10px] py-0.5 px-2 font-bold border-none ${
+                              isIngreso
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                            }`}
+                          >
+                            {isIngreso ? "+ INGRESO" : "- SALIDA"}
+                          </Badge>
+                        </div>
+
+                        <div className="text-right font-mono font-black text-sm shrink-0">
+                          <span className={isIngreso ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                            {isIngreso ? `+${m.cantidad}` : `-${m.cantidad}`}
+                          </span>{" "}
+                          <span className="text-[10px] font-normal text-muted-foreground">
+                            {m.unidad || "UND"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-xs font-bold text-foreground line-clamp-2 leading-relaxed">
+                        {m.descripcion}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-2 truncate max-w-[200px]">
+                          <span className="truncate">{m.motivo || "General"}</span>
+                          {m.solicitante && <span className="text-[10px] font-medium opacity-80 truncate">({m.solicitante})</span>}
+                        </div>
+
+                        <div className="flex items-center gap-2 font-mono text-[10px] shrink-0">
+                          <span>Saldo: <strong className="text-foreground">{m.stock_resultante}</strong></span>
+                          {m.foto_path && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPhoto(m.foto_path || null)}
+                              className="p-1 text-primary hover:bg-primary/10 rounded"
+                            >
+                              <ImageIcon className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* VISTA DESKTOP (TABLA CORPORATIVA) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-secondary/30 text-muted-foreground uppercase text-[10px] font-bold tracking-wider border-b border-border/50">
+                    <tr>
+                      <th className="py-3 px-4">Fecha / Hora</th>
+                      <th className="py-3 px-3 text-center">Tipo</th>
+                      <th className="py-3 px-3">SKU / Código</th>
+                      <th className="py-3 px-4">Descripción del Material</th>
+                      <th className="py-3 px-3">Motivo</th>
+                      <th className="py-3 px-3 text-right">Cantidad</th>
+                      <th className="py-3 px-3 text-right">Stock Ant.</th>
+                      <th className="py-3 px-3 text-right">Stock Result.</th>
+                      <th className="py-3 px-3">Doc. Ref / Solicitante</th>
+                      <th className="py-3 px-3">Registrado Por</th>
+                      <th className="py-3 px-3 text-center">Foto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40 font-medium">
+                    {movimientos.map((m) => {
+                      const isIngreso = m.tipo === "INGRESO";
+                      return (
+                        <tr key={m.id} className="hover:bg-secondary/20 transition-colors">
+                          <td className="py-2.5 px-4 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                            {m.created_at}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <Badge
+                              className={`text-[10px] py-0.5 px-2 font-bold border-none ${
+                                isIngreso
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                              }`}
+                            >
+                              {isIngreso ? "+ INGRESO" : "- SALIDA"}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-primary whitespace-nowrap">
+                            {m.producto}
+                          </td>
+                          <td className="py-2.5 px-4 font-bold text-foreground max-w-sm truncate" title={m.descripcion}>
+                            {m.descripcion}
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
+                            {m.motivo || "-"}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap">
+                            <span className={isIngreso ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                              {isIngreso ? `+${m.cantidad}` : `-${m.cantidad}`}
+                            </span>{" "}
+                            <span className="text-[10px] font-normal text-muted-foreground">
+                              {m.unidad || "UND"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono text-muted-foreground">
+                            {m.stock_anterior}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-foreground">
+                            {m.stock_resultante}
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[150px]">
+                            <div className="font-mono text-xs text-foreground font-semibold truncate">{m.documento_referencia || "-"}</div>
+                            {m.solicitante && <div className="text-[10px] text-muted-foreground truncate">{m.solicitante}</div>}
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground text-[11px] truncate max-w-[120px]">
+                            {m.usuario_nombre || "Sistema"}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {m.foto_path ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPhoto(m.foto_path || null)}
+                                className="p-1.5 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                title="Ver foto de respaldo"
+                              >
+                                <ImageIcon className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground/40 text-[10px]">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* PIE DE TABLA UNIFICADO (CARGAR 50 MÁS) */}
+              <TableLoadMore
+                currentCount={movimientos.length}
+                totalCount={total}
+                hasMore={movimientos.length < total}
+                loadingMore={loadingMore}
+                onLoadMore={handleLoadMore}
+                itemName="movimientos"
+              />
+            </>
+          )}
+        </CardContent>
       </Card>
 
       {/* MODAL DE FOTO */}

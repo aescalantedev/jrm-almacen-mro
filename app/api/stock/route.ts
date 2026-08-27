@@ -12,15 +12,16 @@ export async function GET(req: NextRequest) {
     const offset = (page - 1) * limit;
 
     const joins = `
-      JOIN productos_master p ON s.producto = p.producto
-      LEFT JOIN inventario i ON s.producto = i.producto AND IFNULL(s.lote, '') = IFNULL(i.lote, '')
+      LEFT JOIN grupos_articulos g ON pr.grupo_articulo_id = g.id
+      LEFT JOIN stock_cache sc ON pr.sku = sc.producto
+      LEFT JOIN inventario i ON pr.sku = i.producto
       LEFT JOIN (
-        SELECT producto, IFNULL(lote, '') as m_lote,
+        SELECT producto,
                SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
                SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
         FROM movimientos
-        GROUP BY producto, IFNULL(lote, '')
-      ) m ON s.producto = m.producto AND IFNULL(s.lote, '') = m.m_lote
+        GROUP BY producto
+      ) m ON pr.sku = m.producto
     `;
     const conditions = [];
     const params = [];
@@ -30,51 +31,59 @@ export async function GET(req: NextRequest) {
     }
 
     if (query) {
-      conditions.push(`(UPPER(s.producto) LIKE UPPER(?) OR UPPER(p.glosa) LIKE UPPER(?) OR UPPER(s.lote) LIKE UPPER(?))`);
+      conditions.push(`(UPPER(pr.sku) LIKE UPPER(?) OR UPPER(pr.glosa) LIKE UPPER(?) OR UPPER(COALESCE(g.nombre, '')) LIKE UPPER(?) OR UPPER(pr.rack) LIKE UPPER(?))`);
       const p = `%${query.trim()}%`;
-      params.push(p, p, p);
+      params.push(p, p, p, p);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const stock = db.prepare(`
-      SELECT s.id, s.empresa, s.bodega, s.ubicacion, s.lote, s.producto,
-             p.glosa, p.unidad, s.stock, p.familia, p.peso, s.ultimo_ingreso, s.fecha_sync,
-             i.id as inventario_id,
-             i.cantidad_fisica,
-             i.dif,
-             i.um as inventario_um,
-             i.presentacion,
-             i.n_cajas_bultos,
-             i.largo,
-             i.ancho,
-             i.alto,
-             i.peso_total_cant_fisica,
-             i.observacion as inventario_observacion,
-             i.comentario,
-             i.rack,
-             i.ubicacion_actual,
-             i.almacenamiento,
-             i.contenedor,
-             i.responsable,
-             i.fecha_conteo,
-             i.familia2,
-             i.foto_path,
-             i.usuario_id,
-             i.updated_at as inventario_updated_at,
-             (CASE WHEN (i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0) OR i.usuario_id IS NOT NULL OR (i.comentario IS NOT NULL AND i.comentario != '') THEN 1 ELSE 0 END) as ya_contado,
-             COALESCE(m.total_ingresos, 0) as total_ingresos,
-             COALESCE(m.total_salidas, 0) as total_salidas,
-             (COALESCE(i.cantidad_fisica, s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_disponible
-      FROM stock_cache s
+      SELECT 
+        pr.sku as producto,
+        COALESCE(sc.lote, '') as lote,
+        pr.glosa,
+        pr.unidad_codigo as unidad,
+        (COALESCE(i.cantidad_fisica, sc.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock,
+        COALESCE(g.nombre, 'GENERAL') as familia,
+        pr.peso_neto as peso,
+        sc.ultimo_ingreso,
+        sc.fecha_sync,
+        i.id as inventario_id,
+        i.cantidad_fisica,
+        i.dif,
+        i.um as inventario_um,
+        i.presentacion,
+        i.n_cajas_bultos,
+        i.largo,
+        i.ancho,
+        i.alto,
+        i.peso_total_cant_fisica,
+        i.observacion as inventario_observacion,
+        i.comentario,
+        COALESCE(NULLIF(i.rack, ''), NULLIF(pr.rack, ''), 'Sin asignar') as rack,
+        COALESCE(NULLIF(i.ubicacion_actual, ''), pr.posicion_detalle, '') as ubicacion_actual,
+        COALESCE(NULLIF(i.almacenamiento, ''), pr.almacenamiento_codigo, 'C.C.01') as almacenamiento,
+        COALESCE(NULLIF(i.contenedor, ''), '1') as contenedor,
+        i.responsable,
+        i.fecha_conteo,
+        i.familia2,
+        COALESCE(i.foto_path, pr.foto_url) as foto_path,
+        i.usuario_id,
+        i.updated_at as inventario_updated_at,
+        (CASE WHEN (i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0) OR i.usuario_id IS NOT NULL OR (i.comentario IS NOT NULL AND i.comentario != '') THEN 1 ELSE 0 END) as ya_contado,
+        COALESCE(m.total_ingresos, 0) as total_ingresos,
+        COALESCE(m.total_salidas, 0) as total_salidas,
+        (COALESCE(i.cantidad_fisica, sc.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_disponible
+      FROM productos pr
       ${joins}
       ${whereClause}
-      ORDER BY p.glosa LIMIT ? OFFSET ?
+      ORDER BY pr.glosa LIMIT ? OFFSET ?
     `).all(...params, limit, offset);
 
     const countRow = db.prepare(`
-      SELECT COUNT(*) as total 
-      FROM stock_cache s
+      SELECT COUNT(DISTINCT pr.sku) as total 
+      FROM productos pr
       ${joins}
       ${whereClause}
     `).get(...params) as { total: number };

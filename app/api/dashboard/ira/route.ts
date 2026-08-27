@@ -12,27 +12,29 @@ export async function GET() {
     const auditados = db.prepare(`
       SELECT COUNT(*) as c FROM inventario
       WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
+    `).get() as { c: number } || { c: 0 };
 
     const conformes = db.prepare(`
       SELECT COUNT(*) as c FROM inventario
       WHERE observacion = 'OK' AND dif = 0
         AND cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
+    `).get() as { c: number } || { c: 0 };
 
-    const totalSKU = db.prepare('SELECT COUNT(*) as c FROM inventario').get() as { c: number };
+    const totalSKU = db.prepare('SELECT COUNT(*) as c FROM inventario').get() as { c: number } || { c: 0 };
 
     const iraSKU = auditados.c > 0 ? (conformes.c / auditados.c) * 100 : 0;
 
     const valorFisico = db.prepare(`
-      SELECT COALESCE(SUM(i.cantidad_fisica * p.costo_unitario), 0) as v
-      FROM inventario i JOIN productos_master p ON i.producto = p.producto
-    `).get() as { v: number };
+      SELECT COALESCE(SUM(i.cantidad_fisica * COALESCE(p.costo_unitario_actual, 0)), 0) as v
+      FROM inventario i 
+      LEFT JOIN productos p ON i.producto = p.sku
+    `).get() as { v: number } || { v: 0 };
 
     const valorSistema = db.prepare(`
-      SELECT COALESCE(SUM(s.stock * p.costo_unitario), 0) as v
-      FROM stock_cache s JOIN productos_master p ON s.producto = p.producto
-    `).get() as { v: number };
+      SELECT COALESCE(SUM(s.stock * COALESCE(p.costo_unitario_actual, 0)), 0) as v
+      FROM stock_cache s 
+      LEFT JOIN productos p ON s.producto = p.sku
+    `).get() as { v: number } || { v: 0 };
 
     const iraFinanciera = valorSistema.v > 0
       ? (1 - Math.abs(valorFisico.v - valorSistema.v) / valorSistema.v) * 100
@@ -42,84 +44,109 @@ export async function GET() {
 
     const descalceBruto = db.prepare(`
       SELECT COALESCE(SUM(ABS(i.dif)), 0) as v FROM inventario i
-    `).get() as { v: number };
+    `).get() as { v: number } || { v: 0 };
 
     const descalceNetoUnid = db.prepare(`
       SELECT COALESCE(SUM(i.cantidad_fisica), 0) - (
         SELECT COALESCE(SUM(s.stock), 0) FROM stock_cache s
       ) as v FROM inventario i
-    `).get() as { v: number };
+    `).get() as { v: number } || { v: 0 };
 
-    const porFamilia2 = db.prepare(`
-      SELECT
-        COALESCE(NULLIF(i.familia2, ''), 'OTROS') as familia,
-        COUNT(*) as total,
-        SUM(CASE WHEN i.dif = 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0 THEN 1 ELSE 0 END) as conformes,
-        SUM(CASE WHEN i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0 THEN 1 ELSE 0 END) as con_error,
-        SUM(CASE WHEN i.cantidad_fisica IS NULL OR i.cantidad_fisica = 0 THEN 1 ELSE 0 END) as pendientes
-      FROM inventario i
-      GROUP BY i.familia2
-      ORDER BY total DESC
-    `).all() as Row[];
+    let porFamilia2: Row[] = [];
+    try {
+      porFamilia2 = db.prepare(`
+        SELECT
+          COALESCE(g.nombre, NULLIF(i.familia2, ''), 'GENERAL') as familia,
+          COUNT(*) as total,
+          SUM(CASE WHEN i.dif = 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0 THEN 1 ELSE 0 END) as conformes,
+          SUM(CASE WHEN i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0 THEN 1 ELSE 0 END) as con_error,
+          SUM(CASE WHEN i.cantidad_fisica IS NULL OR i.cantidad_fisica = 0 THEN 1 ELSE 0 END) as pendientes
+        FROM inventario i
+        LEFT JOIN productos p ON i.producto = p.sku
+        LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
+        GROUP BY familia
+        ORDER BY total DESC
+      `).all() as Row[];
+    } catch (err) {
+      console.warn('[API /api/dashboard/ira] porFamilia2 warning:', err);
+    }
 
-    const topImpacto = db.prepare(`
-      SELECT i.producto, p.glosa as descripcion, p.familia,
-             s.stock as stock_sistema, i.cantidad_fisica, i.dif,
-             p.costo_unitario,
-             i.dif * p.costo_unitario as impacto_monetario
-      FROM inventario i
-      JOIN productos_master p ON i.producto = p.producto
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND i.lote = s.lote
-      WHERE i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0
-      ORDER BY ABS(i.dif * p.costo_unitario) DESC
-      LIMIT 10
-    `).all() as Row[];
+    let topImpacto: Row[] = [];
+    try {
+      topImpacto = db.prepare(`
+        SELECT i.producto, 
+               COALESCE(p.glosa, i.producto) as descripcion, 
+               COALESCE(g.nombre, 'GENERAL') as familia,
+               s.stock as stock_sistema, 
+               i.cantidad_fisica, 
+               i.dif,
+               COALESCE(p.costo_unitario_actual, 0) as costo_unitario,
+               (i.dif * COALESCE(p.costo_unitario_actual, 0)) as impacto_monetario
+        FROM inventario i
+        LEFT JOIN productos p ON i.producto = p.sku
+        LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
+        LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
+        WHERE i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0
+        ORDER BY ABS(i.dif * COALESCE(p.costo_unitario_actual, 0)) DESC
+        LIMIT 10
+      `).all() as Row[];
+    } catch (err) {
+      console.warn('[API /api/dashboard/ira] topImpacto warning:', err);
+    }
 
-    const causaRaiz = db.prepare(`
-      SELECT
-        observacion,
-        COUNT(*) as cantidad,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM inventario WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0), 1) as porcentaje
-      FROM inventario
-      WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-      GROUP BY observacion
-      ORDER BY cantidad DESC
-    `).all() as Row[];
+    let causaRaiz: Row[] = [];
+    try {
+      causaRaiz = db.prepare(`
+        SELECT
+          observacion,
+          COUNT(*) as cantidad,
+          ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM inventario WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0), 1) as porcentaje
+        FROM inventario
+        WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
+        GROUP BY observacion
+        ORDER BY cantidad DESC
+      `).all() as Row[];
+    } catch (err) {
+      console.warn('[API /api/dashboard/ira] causaRaiz warning:', err);
+    }
 
     const totalContados = auditados.c;
     const totalFaltantes = db.prepare(`
       SELECT COUNT(*) as c FROM inventario
       WHERE observacion = 'FALTANTE' AND cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
+    `).get() as { c: number } || { c: 0 };
+
     const totalSobrantes = db.prepare(`
       SELECT COUNT(*) as c FROM inventario
       WHERE observacion = 'SOBRANTE' AND cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
+    `).get() as { c: number } || { c: 0 };
 
     return NextResponse.json({
       kpis: {
         iraSKU: Math.round(iraSKU * 10) / 10,
         iraFinanciera: Math.round(iraFinanciera * 10) / 10,
-        metaIRA: 95,
-        metaFinanciera: 98,
+        metaIRA: 95.0,
+        metaFinanciera: 98.0,
         descalceNeto: Math.round(descalceNeto * 100) / 100,
-        descalceBruto: descalceBruto.v,
-        descalceNetoUnid: descalceNetoUnid.v,
-        valorFisico: Math.round(valorFisico.v * 100) / 100,
-        valorSistema: Math.round(valorSistema.v * 100) / 100,
+        descalceBruto: Math.round((descalceBruto.v || 0) * 100) / 100,
+        descalceNetoUnid: Math.round((descalceNetoUnid.v || 0) * 100) / 100,
+        valorFisico: Math.round((valorFisico.v || 0) * 100) / 100,
+        valorSistema: Math.round((valorSistema.v || 0) * 100) / 100,
         totalSKU: totalSKU.c,
         totalAuditados: totalContados,
         totalConformes: conformes.c,
         totalConError: totalContados - conformes.c,
         totalFaltantes: totalFaltantes.c,
         totalSobrantes: totalSobrantes.c,
-        porcentajeAuditado: totalSKU.c > 0 ? Math.round((totalContados / totalSKU.c) * 100) : 0,
+        porcentajeAuditado: totalSKU.c > 0 ? Math.round((totalContados / totalSKU.c) * 1000) / 10 : 0,
       },
       porFamilia2,
       topImpacto,
       causaRaiz,
     });
   } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[API /api/dashboard/ira FATAL ERROR]:', error);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -6,13 +6,14 @@ export async function GET() {
   try {
     const db = getDB();
     const rows = db.prepare(`
-      SELECT i.*, p.glosa as descripcion, p.unidad, p.familia, p.peso as peso_aprox_unitario,
-             p.costo_unitario,
+      SELECT i.*, p.glosa as descripcion, p.unidad_codigo as unidad, COALESCE(g.nombre, 'GENERAL') as familia, p.peso_neto as peso_aprox_unitario,
+             p.costo_unitario_actual as costo_unitario,
              (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
              COALESCE(m.total_ingresos, 0) as total_ingresos,
              COALESCE(m.total_salidas, 0) as total_salidas
       FROM inventario i
-      JOIN productos_master p ON i.producto = p.producto
+      JOIN productos p ON i.producto = p.sku
+      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
       LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
       LEFT JOIN (
         SELECT producto, IFNULL(lote, '') as m_lote,
@@ -183,16 +184,16 @@ export async function GET() {
     const iraSKU = auditados > 0 ? (conformes / auditados) * 100 : 0;
 
     const valorFisicoRow = db.prepare(`
-      SELECT COALESCE(SUM(i.cantidad_fisica * p.costo_unitario), 0) as v
-      FROM inventario i JOIN productos_master p ON i.producto = p.producto
+      SELECT COALESCE(SUM(i.cantidad_fisica * p.costo_unitario_actual), 0) as v
+      FROM inventario i JOIN productos p ON i.producto = p.sku
     `).get() as { v: number };
 
     const valorSistemaRow = db.prepare(`
       SELECT COALESCE(SUM(
-        (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario
+        (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario_actual
       ), 0) as v
       FROM stock_cache s
-      JOIN productos_master p ON s.producto = p.producto
+      JOIN productos p ON s.producto = p.sku
       LEFT JOIN (
         SELECT producto, IFNULL(lote, '') as m_lote,
                SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
@@ -226,14 +227,15 @@ export async function GET() {
 
     // ABC: Clasificar por valor de sistema (stock × costo)
     const inventarioRows = db.prepare(`
-      SELECT i.producto, p.glosa as descripcion, p.familia,
+      SELECT i.producto, p.glosa as descripcion, COALESCE(g.nombre, 'GENERAL') as familia,
              (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
              i.cantidad_fisica,
              i.dif,
-             p.costo_unitario,
-             ((COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario) as valor_sistema
+             p.costo_unitario_actual as costo_unitario,
+             ((COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario_actual) as valor_sistema
       FROM inventario i
-      JOIN productos_master p ON i.producto = p.producto
+      JOIN productos p ON i.producto = p.sku
+      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
       LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
       LEFT JOIN (
         SELECT producto, IFNULL(lote, '') as m_lote,
@@ -280,15 +282,24 @@ export async function GET() {
 
     // Top impacto monetario
     const topImpacto = db.prepare(`
-      SELECT i.producto, p.glosa as descripcion, p.familia,
-             s.stock as stock_sistema, i.cantidad_fisica, i.dif,
-             p.costo_unitario,
-             i.dif * p.costo_unitario as impacto_monetario
+      SELECT i.producto, p.glosa as descripcion, COALESCE(g.nombre, 'GENERAL') as familia,
+             (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
+             i.cantidad_fisica, i.dif,
+             p.costo_unitario_actual as costo_unitario,
+             i.dif * p.costo_unitario_actual as impacto_monetario
       FROM inventario i
-      JOIN productos_master p ON i.producto = p.producto
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND i.lote = s.lote
+      JOIN productos p ON i.producto = p.sku
+      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
+      LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
+      LEFT JOIN (
+        SELECT producto, IFNULL(lote, '') as m_lote,
+               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
+               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
+        FROM movimientos
+        GROUP BY producto, IFNULL(lote, '')
+      ) m ON i.producto = m.producto AND IFNULL(i.lote, '') = m.m_lote
       WHERE i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0
-      ORDER BY ABS(i.dif * p.costo_unitario) DESC
+      ORDER BY ABS(i.dif * p.costo_unitario_actual) DESC
       LIMIT 10
     `).all() as Record<string, unknown>[];
 
@@ -697,9 +708,9 @@ export async function GET() {
     `).all() as { motivo: string; count: number; total_unidades: number }[];
 
     const topRotacion = db.prepare(`
-      SELECT m.producto, p.glosa as descripcion, p.unidad, COALESCE(SUM(m.cantidad), 0) as total_despachado, COUNT(*) as despachos
+      SELECT m.producto, p.glosa as descripcion, p.unidad_codigo as unidad, COALESCE(SUM(m.cantidad), 0) as total_despachado, COUNT(*) as despachos
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      JOIN productos p ON m.producto = p.sku
       WHERE m.tipo = 'SALIDA'
       GROUP BY m.producto
       ORDER BY total_despachado DESC
@@ -976,11 +987,11 @@ export async function GET() {
     });
 
     const kardexRows = db.prepare(`
-      SELECT m.id, m.created_at, m.tipo, m.producto, p.glosa as descripcion, p.unidad, m.lote,
+      SELECT m.id, m.created_at, m.tipo, m.producto, p.glosa as descripcion, p.unidad_codigo as unidad, m.lote,
              m.cantidad, m.stock_anterior, m.stock_resultante, m.motivo, m.documento_referencia,
              m.solicitante, m.rack, u.nombre as usuario_nombre
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      JOIN productos p ON m.producto = p.sku
       LEFT JOIN usuarios u ON m.usuario_id = u.id
       ORDER BY m.created_at DESC, m.id DESC
     `).all() as {

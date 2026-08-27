@@ -50,11 +50,12 @@ export async function GET(req: NextRequest) {
     const movimientos = db.prepare(`
       SELECT m.*,
              p.glosa as descripcion,
-             p.unidad,
-             p.familia,
+             p.unidad_codigo as unidad,
+             COALESCE(g.nombre, 'GENERAL') as familia,
              u.nombre as usuario_nombre
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      JOIN productos p ON m.producto = p.sku
+      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
       LEFT JOIN usuarios u ON m.usuario_id = u.id
       ${whereClause}
       ORDER BY m.created_at DESC, m.id DESC
@@ -64,7 +65,8 @@ export async function GET(req: NextRequest) {
     const countRow = db.prepare(`
       SELECT COUNT(*) as total
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      JOIN productos p ON m.producto = p.sku
+      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
       ${whereClause}
     `).get(...params) as { total: number };
 
@@ -180,7 +182,7 @@ export async function POST(req: NextRequest) {
     db.transaction(() => {
       for (const item of itemsToProcess) {
         // Verify product exists in master
-        const prodExists = db.prepare('SELECT producto, glosa, unidad FROM productos_master WHERE producto = ?').get(item.producto) as { producto: string; glosa: string; unidad: string } | undefined;
+        const prodExists = db.prepare('SELECT sku as producto, glosa, unidad_codigo as unidad FROM productos WHERE sku = ?').get(item.producto) as { producto: string; glosa: string; unidad: string } | undefined;
         if (!prodExists) {
           throw new Error(`El producto ${item.producto} no existe en el catálogo maestro`);
         }
@@ -262,9 +264,9 @@ export async function POST(req: NextRequest) {
     })();
 
     const createdMovements = db.prepare(`
-      SELECT m.*, p.glosa as descripcion, p.unidad, u.nombre as usuario_nombre
+      SELECT m.*, p.glosa as descripcion, p.unidad_codigo as unidad, u.nombre as usuario_nombre
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      JOIN productos p ON m.producto = p.sku
       LEFT JOIN usuarios u ON m.usuario_id = u.id
       WHERE m.id IN (${createdIds.map(() => '?').join(',')})
       ORDER BY m.id ASC

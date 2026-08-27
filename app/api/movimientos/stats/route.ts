@@ -5,7 +5,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = getDB();
 
-    // 1. Tendencia de los últimos 14 días con movimientos
+    // 1. Tendencia de los últimos 30 días con movimientos
     const tendencia = db.prepare(`
       SELECT 
         date(created_at) as fecha,
@@ -21,12 +21,12 @@ export async function GET(req: NextRequest) {
     // 2. Distribución de motivos de salida
     const motivosSalida = db.prepare(`
       SELECT 
-        motivo as name,
+        COALESCE(NULLIF(motivo, ''), 'Salida de Almacén') as name,
         COUNT(*) as count,
         SUM(cantidad) as value
       FROM movimientos
       WHERE tipo = 'SALIDA'
-      GROUP BY motivo
+      GROUP BY name
       ORDER BY value DESC
       LIMIT 8
     `).all();
@@ -35,12 +35,12 @@ export async function GET(req: NextRequest) {
     const topSalidas = db.prepare(`
       SELECT 
         m.producto,
-        p.glosa,
-        p.unidad,
+        COALESCE(p.glosa, m.producto) as glosa,
+        COALESCE(p.unidad_codigo, 'UND') as unidad,
         SUM(m.cantidad) as total_despachado,
         COUNT(*) as frecuencia
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      LEFT JOIN productos p ON m.producto = p.sku
       WHERE m.tipo = 'SALIDA'
       GROUP BY m.producto
       ORDER BY total_despachado DESC
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     // 4. Top solicitantes / áreas
     const topSolicitantes = db.prepare(`
       SELECT 
-        CASE WHEN solicitante = '' THEN 'Sin especificar' ELSE solicitante END as solicitante,
+        CASE WHEN solicitante IS NULL OR solicitante = '' THEN 'Sin especificar' ELSE solicitante END as solicitante,
         COUNT(*) as despachos,
         SUM(cantidad) as unidades
       FROM movimientos

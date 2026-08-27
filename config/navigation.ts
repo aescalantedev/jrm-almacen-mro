@@ -1,11 +1,12 @@
 import {
   LayoutDashboard,
   ClipboardCheck,
-  RefreshCw,
   Package,
   Settings,
   Users,
   History,
+  CircleDollarSign,
+  Database,
   LucideIcon
 } from "lucide-react";
 
@@ -37,8 +38,9 @@ export const navigationGroups: NavGroup[] = [
     roles: ["admin", "auditor"],
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Datos Maestros", url: "/datos-maestros", icon: Database, roles: ["admin"] },
+      { title: "Costos y Precios", url: "/costos", icon: CircleDollarSign, roles: ["admin"] },
       { title: "Usuarios", url: "/users", icon: Users, roles: ["admin"] },
-      { title: "Sincronizar Stock", url: "/settings/sync", icon: RefreshCw, roles: ["admin"] },
       { title: "Configuración", url: "/settings", icon: Settings },
     ],
   },

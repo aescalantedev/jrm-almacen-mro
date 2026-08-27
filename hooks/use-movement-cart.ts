@@ -13,11 +13,14 @@ export interface CartItem {
   lote?: string;
 }
 
+export type MovementCartType = "INGRESO" | "SALIDA" | "INVENTARIO" | null;
+
 const STORAGE_KEY = "mro_movement_cart";
 
 export function useMovementCart() {
-  const [tipo, setTipo] = useState<"INGRESO" | "SALIDA" | null>(null);
+  const [tipo, setTipo] = useState<MovementCartType>(null);
   const [items, setItems] = useState<CartItem[]>([]);
+  const [inventarioCount, setInventarioCount] = useState<number>(0);
 
   // Load from sessionStorage on mount
   useEffect(() => {
@@ -27,6 +30,7 @@ export function useMovementCart() {
         const parsed = JSON.parse(raw);
         if (parsed.tipo) setTipo(parsed.tipo);
         if (Array.isArray(parsed.items)) setItems(parsed.items);
+        if (typeof parsed.inventarioCount === "number") setInventarioCount(parsed.inventarioCount);
       }
     } catch {
       // ignore
@@ -37,23 +41,31 @@ export function useMovementCart() {
   useEffect(() => {
     try {
       if (tipo) {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ tipo, items }));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ tipo, items, inventarioCount }));
       } else {
         sessionStorage.removeItem(STORAGE_KEY);
       }
     } catch {
       // ignore
     }
-  }, [tipo, items]);
+  }, [tipo, items, inventarioCount]);
 
-  const startMovement = useCallback((movementType: "INGRESO" | "SALIDA") => {
+  const startMovement = useCallback((movementType: "INGRESO" | "SALIDA" | "INVENTARIO") => {
     if (tipo && tipo !== movementType && items.length > 0) {
-      toast.error(`Ya tienes un vale de ${tipo === "SALIDA" ? "Salida" : "Ingreso"} en curso. Finalízalo o límpialo primero.`);
+      const currentName = tipo === "SALIDA" ? "Salida" : tipo === "INGRESO" ? "Ingreso" : "Inventario";
+      toast.error(`Ya tienes un modo de ${currentName} en curso. Finalízalo o límpialo primero.`);
       return false;
     }
     setTipo(movementType);
+    if (movementType === "INVENTARIO" && tipo !== "INVENTARIO") {
+      setInventarioCount(0);
+    }
     return true;
   }, [tipo, items.length]);
+
+  const incrementInventarioCount = useCallback(() => {
+    setInventarioCount((prev) => prev + 1);
+  }, []);
 
   const addItem = useCallback(
     (
@@ -68,8 +80,8 @@ export function useMovementCart() {
       cantidad: number,
       targetTipo?: "INGRESO" | "SALIDA"
     ) => {
-      const currentTipo = targetTipo || tipo || "SALIDA";
-      if (!tipo) {
+      const currentTipo = targetTipo || (tipo === "INVENTARIO" ? "SALIDA" : tipo) || "SALIDA";
+      if (!tipo || tipo === "INVENTARIO") {
         setTipo(currentTipo);
       } else if (tipo !== currentTipo) {
         toast.error(`No puedes mezclar ítems de Ingreso y Salida en el mismo vale.`);
@@ -160,6 +172,7 @@ export function useMovementCart() {
   const cancelMovement = useCallback(() => {
     setItems([]);
     setTipo(null);
+    setInventarioCount(0);
     try {
       sessionStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -174,9 +187,11 @@ export function useMovementCart() {
   return {
     tipo,
     items,
+    inventarioCount,
     totalItemsCount,
     totalUnitsCount,
     startMovement,
+    incrementInventarioCount,
     addItem,
     updateItemQty,
     removeItem,

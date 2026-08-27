@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { sanitizeNumeric } from "../utils";
 import type { ConteoForm, StockItem, InventarioItem, User } from "../types";
@@ -84,15 +84,22 @@ export function useConteoForm(
     [form.stock_sistema]
   );
 
+  const startTimeRef = useRef<number>(0);
+  const startDateRef = useRef<string>("");
+
   const clearForm = useCallback(() => {
     setForm(getDefaultForm());
     setIsEditing(null);
     setStockResults([]);
     setSearchQuery("");
+    startTimeRef.current = 0;
+    startDateRef.current = "";
   }, []);
 
   const selectStock = useCallback(
     (item: StockItem) => {
+      startTimeRef.current = Date.now();
+      startDateRef.current = new Date().toISOString();
       const baseUM = item.unidad || "UND";
       let defaultFam2 = "REPUESTO";
       if (item.familia === "HERRAMIENTAS") defaultFam2 = "HERRAMIENTAS";
@@ -239,6 +246,11 @@ export function useConteoForm(
 
     setSaving(true);
     try {
+      const endDate = new Date().toISOString();
+      const durationSec = startTimeRef.current > 0
+        ? Math.max(1, Math.round((Date.now() - startTimeRef.current) / 1000))
+        : 0;
+
       const payload = {
         ...form,
         cantidad_fisica: numFisica,
@@ -246,6 +258,9 @@ export function useConteoForm(
         peso_total_cant_fisica: pesoTotal,
         usuario_id: user?.id,
         fecha_conteo: new Date().toISOString().split("T")[0],
+        fecha_inicio: startDateRef.current || new Date().toISOString(),
+        fecha_fin: endDate,
+        duracion_segundos: durationSec,
       };
 
       const res = await fetch("/api/inventario", {
@@ -258,7 +273,7 @@ export function useConteoForm(
       });
 
       if (res.ok) {
-        toast.success(isEditing ? "Registro actualizado" : "Conteo guardado exitosamente");
+        toast.success(isEditing ? "Registro actualizado" : `Conteo guardado exitosamente (${durationSec}s)`);
         clearForm();
         await loadRegistros();
       } else {

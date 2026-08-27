@@ -22,26 +22,41 @@ import {
   Edit3,
   ArrowLeft,
   ClipboardCheck,
-  FileText,
+  Building2,
+  Boxes,
+  Archive,
 } from "lucide-react";
 import { QuantitySelectorDialog, SelectorProduct } from "@/components/movimientos/quantity-selector-dialog";
+import { QuickCountDialog, QuickCountProduct } from "./quick-count-dialog";
 
 export interface MasterProduct {
   producto: string;
   glosa: string;
   unidad: string;
-  familia: string;
-  subfamilia: string;
-  tipo: string;
-  peso: number;
+  grupo_articulo_id?: number;
+  familia?: string;
+  contenedor_id?: number;
+  contenedor_nombre?: string;
+  contenedor_codigo?: string;
+  bodega_id?: number;
+  bodega_nombre?: string;
+  tipo_almacenamiento_id?: number;
+  tipo_almacenamiento_nombre?: string;
+  tipo_almacenamiento_codigo?: string;
+  rack?: string;
+  nivel_rack?: string;
+  posicion_detalle?: string;
+  almacenamiento_codigo?: string;
   costo_unitario: number;
+  peso: number;
+  stock_seguridad_min?: number;
+  stock_maximo?: number;
   tipo_acero?: string;
   grado_acero?: string;
   espesor_acero?: string;
-  peso_producto?: number;
   stock_total?: number;
-  rack?: string;
   lote?: string;
+  foto_url?: string;
 }
 
 interface ProductDetailSheetProps {
@@ -63,10 +78,12 @@ export function ProductDetailSheet({
   isAdmin = false,
   onEdit,
   onAddMovement,
+  onProductUpdated,
 }: ProductDetailSheetProps) {
   const router = useRouter();
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [selectedMovementTipo, setSelectedMovementTipo] = useState<"INGRESO" | "SALIDA">("SALIDA");
+  const [quickCountOpen, setQuickCountOpen] = useState(false);
 
   if (!product) return null;
 
@@ -77,9 +94,8 @@ export function ProductDetailSheet({
     setSelectorOpen(true);
   };
 
-  const handleGoToFullInventory = () => {
-    onOpenChange(false);
-    router.push(`/inventario?sku=${encodeURIComponent(product.producto)}`);
+  const handleStartQuickCount = () => {
+    setQuickCountOpen(true);
   };
 
   const selectorProduct: SelectorProduct = {
@@ -89,6 +105,17 @@ export function ProductDetailSheet({
     stock_actual: stockActual,
     rack: product.rack || "",
     lote: product.lote || "",
+  };
+
+  const quickCountProduct: QuickCountProduct = {
+    producto: product.producto,
+    glosa: product.glosa,
+    unidad: product.unidad || "UND",
+    stock_actual: stockActual,
+    rack: product.rack || "",
+    posicion_detalle: product.posicion_detalle || "",
+    lote: product.lote || "",
+    foto_url: product.foto_url,
   };
 
   return (
@@ -120,7 +147,7 @@ export function ProductDetailSheet({
                       {product.producto}
                     </span>
                     {product.familia && (
-                      <Badge variant="outline" className="text-[10px] truncate max-w-[120px]">
+                      <Badge variant="outline" className="text-[10px] truncate max-w-[140px]">
                         {product.familia}
                       </Badge>
                     )}
@@ -155,7 +182,7 @@ export function ProductDetailSheet({
             {/* NOMBRE COMPLETO */}
             <div className="p-4 rounded-2xl bg-secondary/20 border border-border/40 space-y-1">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                Descripción Completa del Material
+                Descripción Completa del Material (SAP MAKTX)
               </span>
               <p className="text-sm sm:text-base font-bold text-foreground leading-relaxed">
                 {product.glosa}
@@ -188,39 +215,65 @@ export function ProductDetailSheet({
                   <div className="text-lg sm:text-xl font-black font-mono text-foreground truncate">
                     {product.rack || "Sin asignar"}
                   </div>
+                  {product.posicion_detalle && (
+                    <div className="text-[11px] text-muted-foreground font-semibold truncate">
+                      {product.posicion_detalle}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+            </div>
+
+            {/* UBICACIÓN JERÁRQUICA SAP (BODEGA & CONTENEDOR) */}
+            <div className="space-y-2.5">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                Almacén & Depósito Físico (SAP LGORT / LGTYP)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="p-3 rounded-xl border border-border/50 bg-card flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-primary shrink-0">
+                    <Building2 className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-muted-foreground uppercase font-bold">Bodega / Almacén</div>
+                    <div className="text-xs font-bold text-foreground truncate">{product.bodega_nombre || "ALM MRO CHILCA"}</div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-border/50 bg-card flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-primary shrink-0">
+                    <Boxes className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] text-muted-foreground uppercase font-bold">Contenedor / Zona</div>
+                    <div className="text-xs font-bold text-foreground truncate">{product.contenedor_nombre || "Almacén Central"}</div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* ESPECIFICACIONES TÉCNICAS */}
             <div className="space-y-2.5">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Ficha Técnica del Material
+                Ficha Técnica del Material (SAP MM)
               </span>
               <div className="rounded-2xl border border-border/50 bg-card overflow-hidden divide-y divide-border/40 text-xs">
                 <div className="flex justify-between items-center p-3">
-                  <span className="text-muted-foreground">Unidad de Medida (UM)</span>
+                  <span className="text-muted-foreground">Unidad de Medida (MEINS)</span>
                   <span className="font-bold text-foreground">{product.unidad || "UND"}</span>
                 </div>
 
                 {product.familia && (
                   <div className="flex justify-between items-center p-3">
-                    <span className="text-muted-foreground">Familia</span>
+                    <span className="text-muted-foreground">Grupo de Artículos (MATKL)</span>
                     <span className="font-semibold text-foreground">{product.familia}</span>
                   </div>
                 )}
 
-                {product.subfamilia && (
+                {product.tipo_almacenamiento_nombre && (
                   <div className="flex justify-between items-center p-3">
-                    <span className="text-muted-foreground">Subfamilia</span>
-                    <span className="font-semibold text-foreground">{product.subfamilia}</span>
-                  </div>
-                )}
-
-                {product.tipo && (
-                  <div className="flex justify-between items-center p-3">
-                    <span className="text-muted-foreground">Tipo de Repuesto / Material</span>
-                    <span className="font-semibold text-foreground">{product.tipo}</span>
+                    <span className="text-muted-foreground">Formato de Almacenamiento (LETYP)</span>
+                    <span className="font-semibold text-foreground">{product.tipo_almacenamiento_nombre}</span>
                   </div>
                 )}
 
@@ -230,6 +283,13 @@ export function ProductDetailSheet({
                       <Scale className="h-3.5 w-3.5" /> Peso Unitario Estimado
                     </span>
                     <span className="font-mono font-bold text-foreground">{product.peso} kg</span>
+                  </div>
+                )}
+
+                {product.stock_seguridad_min !== undefined && product.stock_seguridad_min > 0 && (
+                  <div className="flex justify-between items-center p-3">
+                    <span className="text-muted-foreground">Stock de Seguridad Mínimo</span>
+                    <span className="font-mono font-bold text-foreground">{product.stock_seguridad_min} {product.unidad || "UND"}</span>
                   </div>
                 )}
 
@@ -258,7 +318,7 @@ export function ProductDetailSheet({
                   <>
                     <div className="flex justify-between items-center p-3 bg-emerald-500/5">
                       <span className="text-muted-foreground flex items-center gap-1.5 font-semibold">
-                        <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Costo Unitario
+                        <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Costo Unitario Actual (VERPR)
                       </span>
                       <span className="font-mono font-bold text-xs sm:text-sm text-emerald-600 dark:text-emerald-400">
                         S/ {product.costo_unitario.toFixed(2)}
@@ -287,7 +347,7 @@ export function ProductDetailSheet({
             </div>
           </div>
 
-          {/* BARRA DE ACCIONES INFERIOR FIJA */}
+          {/* BARRA DE ACCIONES INFERIOR FIJA: 3 ACCIONES DEL OPERARIO */}
           <div className="p-4 sm:p-6 border-t border-border/50 bg-secondary/15 space-y-2.5">
             <div className="grid grid-cols-2 gap-2.5">
               <Button
@@ -309,15 +369,15 @@ export function ProductDetailSheet({
               </Button>
             </div>
 
-            {/* BOTÓN INVENTARIAR / CONTEO FÍSICO COMPLETO */}
+            {/* BOTÓN CONTEO RÁPIDO / INVENTARIO DIRECTO */}
             <Button
               type="button"
               variant="outline"
-              onClick={handleGoToFullInventory}
-              className="w-full h-11 text-xs font-bold gap-2 rounded-xl border-primary/40 text-primary hover:bg-primary/10"
+              onClick={handleStartQuickCount}
+              className="w-full h-11 text-xs font-bold gap-2 rounded-xl border-primary/50 text-primary hover:bg-primary/10 shadow-xs"
             >
               <ClipboardCheck className="h-4 w-4" />
-              Inventariar / Conteo Físico Completo (Medidas, Peso y Foto)
+              Inventariar / Conteo Rápido con Cronómetro
             </Button>
           </div>
         </SheetContent>
@@ -338,6 +398,17 @@ export function ProductDetailSheet({
             return ok;
           }
           return false;
+        }}
+      />
+
+      {/* MODAL DE CONTEO RÁPIDO DIRECTO */}
+      <QuickCountDialog
+        open={quickCountOpen}
+        onOpenChange={setQuickCountOpen}
+        product={quickCountProduct}
+        onSaved={() => {
+          if (onProductUpdated) onProductUpdated();
+          onOpenChange(false);
         }}
       />
     </>

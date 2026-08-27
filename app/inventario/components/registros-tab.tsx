@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TableLoadMore } from "@/components/ui/table-load-more";
 import { ObsBadge } from "./obs-badge";
 import type { InventarioItem } from "../types";
 
@@ -335,18 +336,18 @@ export function RegistrosTab({
             {/* DESKTOP VIEW */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-xs">
-                <thead className="bg-secondary/50 border-b border-border/50 sticky top-0 z-10 backdrop-blur-sm">
+                <thead className="bg-secondary/30 border-b border-border/50 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="text-left py-3 px-4 font-bold text-muted-foreground uppercase tracking-wider">SKU</th>
-                    <th className="text-left py-3 px-4 font-bold text-muted-foreground uppercase tracking-wider">Descripción</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Familia 2</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Presentación</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Stock Sis.</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Físico</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">DIF</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Ubicación</th>
-                    <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Estado</th>
-                    <th className="text-center py-3 px-4 font-bold text-muted-foreground uppercase tracking-wider">Acciones</th>
+                    <th className="text-left py-3 px-4 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">SKU</th>
+                    <th className="text-left py-3 px-4 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Descripción</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Familia</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Presentación</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Stock Sis.</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Físico</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">DIF</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Ubicación</th>
+                    <th className="text-center py-3 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Estado</th>
+                    <th className="text-center py-3 px-4 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
@@ -409,36 +410,15 @@ export function RegistrosTab({
               </table>
             </div>
 
-            {/* LOAD MORE */}
-            {hasMore && (
-              <div className="p-4 flex justify-center">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={loadMore}
-                  disabled={loadingMore}
-                  className="h-9 text-xs font-semibold gap-1.5 rounded-xl"
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Cargando más...
-                    </>
-                  ) : (
-                    <>
-                      Cargar más ({registros.length} de {total})
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-
-            {!hasMore && registros.length > 0 && (
-              <div className="p-3 text-center text-[10px] text-muted-foreground border-t border-border/30">
-                Todos los registros cargados ({registros.length} de {total})
-              </div>
-            )}
+            {/* PIE DE TABLA UNIFICADO (CARGAR 50 MÁS) */}
+            <TableLoadMore
+              currentCount={registros.length}
+              totalCount={total}
+              hasMore={hasMore && registros.length < total}
+              loadingMore={loadingMore}
+              onLoadMore={loadMore}
+              itemName="registros"
+            />
           </>
         )}
       </CardContent>

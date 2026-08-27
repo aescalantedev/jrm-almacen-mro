@@ -14,6 +14,8 @@ import {
   Settings,
   RefreshCw,
   Warehouse,
+  CircleDollarSign,
+  Database,
   LucideIcon,
   LogOut,
   User,
@@ -45,7 +47,7 @@ const ROUTE_CONFIG: Record<string, RouteInfo> = {
   "/productos": {
     title: "Productos",
     subtitle: "Catálogo general y operaciones",
-    badge: "1,829 SKUs",
+    badge: "2,755 SKUs",
     icon: Package,
   },
   "/inventario": {
@@ -83,15 +85,22 @@ const ROUTE_CONFIG: Record<string, RouteInfo> = {
     badge: "ALM MRO CHILCA",
     icon: LayoutDashboard,
   },
+  "/datos-maestros": {
+    title: "Datos Maestros",
+    subtitle: "Parametrización MM / WM",
+    badge: "SAP MM",
+    icon: Database,
+  },
+  "/costos": {
+    title: "Costos",
+    subtitle: "Mantenimiento de precios",
+    badge: "ADMIN",
+    icon: CircleDollarSign,
+  },
   "/users": {
     title: "Usuarios",
     subtitle: "Cuentas y roles del personal",
     icon: Users,
-  },
-  "/settings/sync": {
-    title: "Sincronización",
-    subtitle: "Actualización de stock",
-    icon: RefreshCw,
   },
   "/settings": {
     title: "Configuración",

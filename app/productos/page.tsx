@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Package,
@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   FileText,
   Eye,
+  ClipboardCheck,
+  Building2,
+  Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,14 +34,41 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Combobox, ComboboxOption } from "@/components/ui/combobox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "../inventario/hooks/use-auth";
 import { BarcodeScanner } from "@/components/ui/barcode-scanner";
 import { ProductDetailSheet, MasterProduct } from "@/components/products/product-detail-sheet";
 import { QuantitySelectorDialog, SelectorProduct } from "@/components/movimientos/quantity-selector-dialog";
+import { QuickCountDialog, QuickCountProduct } from "@/components/products/quick-count-dialog";
 import { MovementCartSheet } from "@/components/movimientos/movement-cart-sheet";
-import { useMovementCart } from "@/hooks/use-movement-cart";
+import { NewProductDialog } from "@/components/products/new-product-dialog";
+import { MultiProductEditSheet } from "@/components/products/multi-product-edit-sheet";
+import { useMovementCart, MovementCartType } from "@/hooks/use-movement-cart";
+import { TableLoadMore } from "@/components/ui/table-load-more";
 
 const PAGE_SIZE = 50;
+
+interface BodegaOption {
+  id: number;
+  codigo: string;
+  nombre: string;
+}
+
+interface ContenedorOption {
+  id: number;
+  bodega_id?: number;
+  codigo_contenedor: string;
+  nombre: string;
+}
+
+interface MasterCatalogOptions {
+  bodegas: BodegaOption[];
+  grupos: ComboboxOption[];
+  unidades: ComboboxOption[];
+  contenedores: ContenedorOption[];
+  tiposAlmacenamiento: ComboboxOption[];
+}
 
 function SkeletonCard() {
   return (
@@ -56,86 +86,266 @@ function SkeletonCard() {
 function EditFields({
   form,
   onChange,
+  catalogs,
 }: {
   form: Partial<MasterProduct>;
   onChange: (field: string, value: string | number) => void;
+  catalogs: MasterCatalogOptions;
 }) {
+  // Encontrar la bodega activa a partir del contenedor o de form.bodega_id
+  const selectedBodegaId = useMemo(() => {
+    if (form.bodega_id) return Number(form.bodega_id);
+    if (form.contenedor_id) {
+      const cont = catalogs.contenedores.find((c) => c.id === Number(form.contenedor_id));
+      if (cont?.bodega_id) return cont.bodega_id;
+    }
+    return catalogs.bodegas[0]?.id || 1;
+  }, [form.bodega_id, form.contenedor_id, catalogs.contenedores, catalogs.bodegas]);
+
+  // Filtrar contenedores pertenecientes a la bodega seleccionada
+  const filteredContenedoresOptions: ComboboxOption[] = useMemo(() => {
+    return catalogs.contenedores
+      .filter((c) => !c.bodega_id || c.bodega_id === selectedBodegaId)
+      .map((c) => ({
+        value: String(c.id),
+        label: `${c.codigo_contenedor} - ${c.nombre}`,
+      }));
+  }, [catalogs.contenedores, selectedBodegaId]);
+
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="space-y-4 text-xs">
+      {/* 1. DATOS GENERALES Y CLASIFICACIÓN SAP MM */}
+      <div className="p-3.5 rounded-xl bg-secondary/15 border border-border/50 space-y-3">
+        <div className="font-bold text-[11px] uppercase tracking-wider text-primary">
+          1. Identificación & Clasificación SAP MM
+        </div>
+
         <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Glosa</label>
+          <label className="text-[10px] text-muted-foreground uppercase font-bold">
+            Descripción / Glosa (MAKTX)
+          </label>
           <Input
             value={form.glosa || ""}
             onChange={(e) => onChange("glosa", e.target.value)}
-            className="h-9 text-xs rounded-lg mt-1"
+            className="h-9 text-xs rounded-lg mt-1 font-semibold"
           />
         </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Unidad</label>
-          <Input
-            value={form.unidad || ""}
-            onChange={(e) => onChange("unidad", e.target.value)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Familia</label>
-          <Input
-            value={form.familia || ""}
-            onChange={(e) => onChange("familia", e.target.value)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Subfamilia</label>
-          <Input
-            value={form.subfamilia || ""}
-            onChange={(e) => onChange("subfamilia", e.target.value)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Tipo</label>
-          <Input
-            value={form.tipo || ""}
-            onChange={(e) => onChange("tipo", e.target.value)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Peso (kg)</label>
-          <Input
-            type="number"
-            step="0.01"
-            value={form.peso ?? ""}
-            onChange={(e) => onChange("peso", parseFloat(e.target.value) || 0)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">
+              Grupo de Artículos (MATKL)
+            </label>
+            <div className="mt-1">
+              <Combobox
+                options={catalogs.grupos}
+                value={form.grupo_articulo_id ? String(form.grupo_articulo_id) : ""}
+                onChange={(val) => {
+                  const num = parseInt(val, 10);
+                  onChange("grupo_articulo_id", isNaN(num) ? 1 : num);
+                  const found = catalogs.grupos.find((g) => g.value === val);
+                  if (found) onChange("familia", found.label);
+                }}
+                placeholder="Seleccionar Grupo..."
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">
+              Unidad de Medida (MEINS)
+            </label>
+            <div className="mt-1">
+              <Combobox
+                options={catalogs.unidades}
+                value={form.unidad || "UND"}
+                onChange={(val) => onChange("unidad", val.toUpperCase())}
+                placeholder="Seleccionar Unidad..."
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Costo Unitario</label>
-          <Input
-            type="number"
-            step="0.01"
-            value={form.costo_unitario ?? ""}
-            onChange={(e) => onChange("costo_unitario", parseFloat(e.target.value) || 0)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
+
+      {/* 2. JERARQUÍA DE ALMACENAMIENTO: BODEGA -> CONTENEDOR -> RACK -> POSICIÓN */}
+      <div className="p-3.5 rounded-xl bg-secondary/15 border border-border/50 space-y-3">
+        <div className="font-bold text-[11px] uppercase tracking-wider text-primary">
+          2. Jerarquía de Almacenamiento (Bodega ➔ Contenedor ➔ Ubicación)
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* PASO 1: BODEGA */}
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+              <Building2 className="h-3 w-3 text-primary" /> Bodega / Centro (LGORT)
+            </label>
+            <select
+              value={selectedBodegaId}
+              onChange={(e) => {
+                const newBodegaId = parseInt(e.target.value, 10);
+                onChange("bodega_id", newBodegaId);
+                // Si el contenedor actual no pertenece a la nueva bodega, seleccionar el primero disponible
+                const matchingCont = catalogs.contenedores.find((c) => c.bodega_id === newBodegaId);
+                if (matchingCont) {
+                  onChange("contenedor_id", matchingCont.id);
+                  onChange("contenedor_nombre", matchingCont.nombre);
+                }
+              }}
+              className="w-full h-9 px-3 mt-1 rounded-lg border border-border bg-background text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {catalogs.bodegas.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.codigo} - {b.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* PASO 2: CONTENEDOR / ZONA */}
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1">
+              <Boxes className="h-3 w-3 text-primary" /> Contenedor / Zona (LGTYP)
+            </label>
+            <div className="mt-1">
+              <Combobox
+                options={filteredContenedoresOptions}
+                value={form.contenedor_id ? String(form.contenedor_id) : ""}
+                onChange={(val) => {
+                  const contId = parseInt(val, 10) || 1;
+                  onChange("contenedor_id", contId);
+                  const found = catalogs.contenedores.find((c) => c.id === contId);
+                  if (found) {
+                    onChange("contenedor_nombre", found.nombre);
+                    if (found.bodega_id) onChange("bodega_id", found.bodega_id);
+                  }
+                }}
+                placeholder="Seleccionar Contenedor..."
+                className="h-9 text-xs"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* PASO 3: TIPO DE ALMACENAMIENTO */}
         <div>
-          <label className="text-[10px] text-muted-foreground uppercase font-semibold">Tipo Acero</label>
-          <Input
-            value={form.tipo_acero || ""}
-            onChange={(e) => onChange("tipo_acero", e.target.value)}
-            className="h-9 text-xs rounded-lg mt-1"
-          />
+          <label className="text-[10px] text-muted-foreground uppercase font-bold">
+            Formato de Almacenamiento / Estiba (LETYP)
+          </label>
+          <div className="mt-1">
+            <Combobox
+              options={catalogs.tiposAlmacenamiento}
+              value={form.tipo_almacenamiento_id ? String(form.tipo_almacenamiento_id) : "1"}
+              onChange={(val) => onChange("tipo_almacenamiento_id", parseInt(val, 10) || 1)}
+              placeholder="Tipo de Almacenamiento..."
+              className="h-9 text-xs"
+            />
+          </div>
+        </div>
+
+        {/* PASO 4: RACK, NIVEL Y POSICIÓN DETALLE */}
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">Rack / Estante</label>
+            <Input
+              value={form.rack || ""}
+              onChange={(e) => onChange("rack", e.target.value.toUpperCase())}
+              placeholder="RACK 01"
+              className="h-9 text-xs rounded-lg mt-1 font-semibold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">Nivel</label>
+            <Input
+              value={form.nivel_rack || ""}
+              onChange={(e) => onChange("nivel_rack", e.target.value.toUpperCase())}
+              placeholder="NIVEL 2"
+              className="h-9 text-xs rounded-lg mt-1 font-semibold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">Posición / Gaveta</label>
+            <Input
+              value={form.posicion_detalle || ""}
+              onChange={(e) => onChange("posicion_detalle", e.target.value.toUpperCase())}
+              placeholder="GAVETA 14"
+              className="h-9 text-xs rounded-lg mt-1 font-semibold"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. COSTOS, DIMENSIONES & METALMECÁNICA */}
+      <div className="p-3.5 rounded-xl bg-secondary/15 border border-border/50 space-y-3">
+        <div className="font-bold text-[11px] uppercase tracking-wider text-primary">
+          3. Valorización & Ficha Metalmecánica
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">
+              Costo Unitario (S/.)
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.costo_unitario ?? ""}
+              onChange={(e) => onChange("costo_unitario", parseFloat(e.target.value) || 0)}
+              className="h-9 text-xs rounded-lg mt-1 font-mono font-bold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">
+              Peso Neto (kg)
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.peso ?? ""}
+              onChange={(e) => onChange("peso", parseFloat(e.target.value) || 0)}
+              className="h-9 text-xs rounded-lg mt-1 font-mono font-semibold"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">
+              Stock Mínimo (Seguridad)
+            </label>
+            <Input
+              type="number"
+              step="1"
+              value={form.stock_seguridad_min ?? ""}
+              onChange={(e) => onChange("stock_seguridad_min", parseFloat(e.target.value) || 0)}
+              className="h-9 text-xs rounded-lg mt-1 font-mono"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">Tipo Acero</label>
+            <Input
+              value={form.tipo_acero || ""}
+              onChange={(e) => onChange("tipo_acero", e.target.value)}
+              className="h-9 text-xs rounded-lg mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">Grado Acero</label>
+            <Input
+              value={form.grado_acero || ""}
+              onChange={(e) => onChange("grado_acero", e.target.value)}
+              className="h-9 text-xs rounded-lg mt-1"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground uppercase font-bold">Espesor Acero</label>
+            <Input
+              value={form.espesor_acero || ""}
+              onChange={(e) => onChange("espesor_acero", e.target.value)}
+              className="h-9 text-xs rounded-lg mt-1"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -155,23 +365,41 @@ export default function ProductosPage() {
   const [editForm, setEditForm] = useState<Partial<MasterProduct>>({});
   const [saving, setSaving] = useState(false);
 
+  // Catálogos para Comboboxes
+  const [catalogs, setCatalogs] = useState<MasterCatalogOptions>({
+    bodegas: [],
+    grupos: [],
+    unidades: [],
+    contenedores: [],
+    tiposAlmacenamiento: [],
+  });
+
   // Overlays
   const [selectedProduct, setSelectedProduct] = useState<MasterProduct | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectorProduct, setSelectorProduct] = useState<SelectorProduct | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [defaultSelectorTipo, setDefaultSelectorTipo] = useState<"INGRESO" | "SALIDA">("SALIDA");
+  const [quickCountProduct, setQuickCountProduct] = useState<QuickCountProduct | null>(null);
+  const [quickCountOpen, setQuickCountOpen] = useState(false);
+
   const [cartSheetOpen, setCartSheetOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [selectedSkus, setSelectedSkus] = useState<string[]>([]);
+  const [newProductOpen, setNewProductOpen] = useState(false);
+  const [multiEditOpen, setMultiEditOpen] = useState(false);
+  const [deletingMultiple, setDeletingMultiple] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cart hook
+  // Cart hook (Vales de Ingreso y Salida y Conteo)
   const {
     tipo: cartTipo,
     items: cartItems,
+    inventarioCount,
     totalItemsCount,
     totalUnitsCount,
     startMovement,
+    incrementInventarioCount,
     addItem,
     updateItemQty,
     removeItem,
@@ -188,6 +416,42 @@ export default function ProductosPage() {
     return raw ? JSON.parse(raw).token : "";
   };
 
+  const loadCatalogs = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await fetch("/api/maestros", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCatalogs({
+          bodegas: data.bodegas || [{ id: 1, codigo: "MRO-CHILCA", nombre: "ALM MRO CHILCA" }],
+          grupos: (data.grupos || []).map((g: { id: number; nombre: string; codigo: string }) => ({
+            value: String(g.id),
+            label: `${g.codigo} - ${g.nombre}`,
+          })),
+          unidades: (data.unidades || []).map((u: { codigo_unidad: string; nombre: string }) => ({
+            value: u.codigo_unidad,
+            label: `${u.codigo_unidad} (${u.nombre})`,
+          })),
+          contenedores: (data.contenedores || []).map((c: { id: number; bodega_id?: number; nombre: string; codigo_contenedor: string }) => ({
+            id: c.id,
+            bodega_id: c.bodega_id || 1,
+            codigo_contenedor: c.codigo_contenedor,
+            nombre: c.nombre,
+          })),
+          tiposAlmacenamiento: (data.tiposAlmacenamiento || []).map((t: { id: number; nombre: string; codigo: string }) => ({
+            value: String(t.id),
+            label: `${t.codigo} (${t.nombre})`,
+          })),
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const loadPage = useCallback(
     async (query: string, pageNum: number, append = false) => {
       if (pageNum === 1) setLoading(true);
@@ -200,9 +464,7 @@ export default function ProductosPage() {
         });
         if (query.trim()) params.set("q", query.trim());
 
-        const res = await fetch(`/api/productos?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${getToken()}` },
-        });
+        const res = await fetch(`/api/productos?${params.toString()}`);
         const data = await res.json();
 
         if (append) {
@@ -211,7 +473,7 @@ export default function ProductosPage() {
           setItems(data.items || []);
         }
         setTotal(data.total || 0);
-        setHasMore(data.page * data.limit < data.total);
+        setHasMore((data.items?.length || 0) === PAGE_SIZE);
       } catch {
         toast.error("Error al cargar productos");
       } finally {
@@ -223,38 +485,24 @@ export default function ProductosPage() {
   );
 
   useEffect(() => {
-    loadPage("", 1);
-  }, [loadPage]);
-
-  // Debounced real-time search
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchQuery(val);
-
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    if (val.trim().length >= 2) {
-      debounceTimerRef.current = setTimeout(() => {
-        setPage(1);
-        loadPage(val, 1, false);
-      }, 300);
-    } else if (val.trim().length === 0) {
-      setPage(1);
-      loadPage("", 1, false);
-    }
-  };
-
-  const handleSearch = () => {
-    setPage(1);
-    loadPage(searchQuery, 1, false);
-  };
-
-  const handleClearSearch = () => {
-    setSearchQuery("");
-    setPage(1);
     loadPage("", 1, false);
+    loadCatalogs();
+  }, [loadPage, loadCatalogs]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setPage(1);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      loadPage(val, 1, false);
+    }, 300);
+  };
+
+  const handleScanResult = (result: string) => {
+    const clean = result.trim();
+    setSearchQuery(clean);
+    setScannerOpen(false);
+    loadPage(clean, 1, false);
   };
 
   const handleLoadMore = () => {
@@ -263,77 +511,80 @@ export default function ProductosPage() {
     loadPage(searchQuery, nextPage, true);
   };
 
-  // Open product detail sheet
-  const handleOpenDetail = (item: MasterProduct) => {
-    setSelectedProduct(item);
+  const handleOpenDetail = (product: MasterProduct) => {
+    setSelectedProduct(product);
     setDetailOpen(true);
   };
 
-  // Tapping a product card:
-  // - If a movement mode (Salida / Ingreso) is active: opens QuantitySelectorDialog directly.
-  // - If NO mode is active: opens full ProductDetailSheet.
-  const handleProductTap = (item: MasterProduct) => {
-    if (cartTipo) {
-      const p: SelectorProduct = {
-        producto: item.producto,
-        glosa: item.glosa,
-        unidad: item.unidad || "UND",
-        stock_actual: Number(item.stock_total ?? 0),
-        rack: item.rack || "",
-        lote: item.lote || "",
-      };
-      setSelectorProduct(p);
+  const handleStartQuickCountDirect = (product: MasterProduct, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setQuickCountProduct({
+      producto: product.producto,
+      glosa: product.glosa,
+      unidad: product.unidad || "UND",
+      stock_actual: Number(product.stock_total ?? 0),
+      rack: product.rack || "",
+      posicion_detalle: product.posicion_detalle || "",
+      lote: product.lote || "",
+      foto_url: product.foto_url,
+    });
+    setQuickCountOpen(true);
+  };
+
+  const handleProductCardClick = (product: MasterProduct) => {
+    if (cartTipo === "INVENTARIO") {
+      handleStartQuickCountDirect(product);
+    } else if (cartTipo === "INGRESO" || cartTipo === "SALIDA") {
+      setSelectorProduct({
+        producto: product.producto,
+        glosa: product.glosa,
+        unidad: product.unidad || "UND",
+        stock_actual: Number(product.stock_total ?? 0),
+        rack: product.rack || "",
+        lote: product.lote || "",
+      });
       setDefaultSelectorTipo(cartTipo);
       setSelectorOpen(true);
     } else {
-      handleOpenDetail(item);
+      handleOpenDetail(product);
     }
   };
 
-  // Start Ingreso / Salida mode from FABs
-  const handleStartMode = (tipo: "INGRESO" | "SALIDA") => {
+  const handleStartMode = (tipo: MovementCartType) => {
+    if (!tipo) return;
     startMovement(tipo);
-    toast.info(`Modo ${tipo === "SALIDA" ? "Salida" : "Ingreso"} activado. Toca los productos para agregarlos al vale.`);
+    if (tipo === "INVENTARIO") {
+      toast.info("Modo Inventario activado. Toca cualquier repuesto para iniciar su conteo con cronómetro.");
+    } else {
+      toast.info(`Modo ${tipo === "INGRESO" ? "Ingreso" : "Salida"} activado. Toca los productos para agregarlos al vale.`);
+    }
   };
 
   const startEdit = (item: MasterProduct) => {
     setEditingItem(item);
-    setEditForm({
-      glosa: item.glosa,
-      unidad: item.unidad,
-      familia: item.familia,
-      subfamilia: item.subfamilia,
-      tipo: item.tipo,
-      peso: item.peso,
-      costo_unitario: item.costo_unitario,
-      tipo_acero: item.tipo_acero,
-      grado_acero: item.grado_acero,
-      espesor_acero: item.espesor_acero,
-      peso_producto: item.peso_producto,
-    });
+    setEditForm({ ...item });
   };
 
   const handleFieldChange = (field: string, value: string | number) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const saveProduct = async (producto: string) => {
+  const saveProduct = async (sku: string) => {
     setSaving(true);
     try {
       const res = await fetch("/api/productos", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({ producto, ...editForm }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ producto: sku, ...editForm }),
       });
+
       if (res.ok) {
-        toast.success("Producto actualizado");
+        toast.success("Producto actualizado correctamente");
         setEditingItem(null);
         loadPage(searchQuery, page, false);
       } else {
-        toast.error("Error al actualizar");
+        const data = await res.json();
+        toast.error(data.error || "Error al guardar");
       }
     } catch {
       toast.error("Error de conexión");
@@ -342,210 +593,362 @@ export default function ProductosPage() {
     }
   };
 
-  if (!user) return null;
+  const isAllSelected = items.length > 0 && selectedSkus.length === items.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedSkus([]);
+    } else {
+      setSelectedSkus(items.map((i) => i.producto));
+    }
+  };
+
+  const toggleSelectSku = (sku: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedSkus((prev) =>
+      prev.includes(sku) ? prev.filter((s) => s !== sku) : [...prev, sku]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedSkus.length === 0) return;
+    if (!confirm(`¿Estás seguro de eliminar los ${selectedSkus.length} productos seleccionados? Esta acción no se puede deshacer.`)) return;
+
+    setDeletingMultiple(true);
+    try {
+      const res = await fetch("/api/productos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skus: selectedSkus }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`${data.deleted || selectedSkus.length} productos eliminados`);
+        setSelectedSkus([]);
+        loadPage(searchQuery, 1, false);
+      } else {
+        toast.error(data.error || "Error al eliminar");
+      }
+    } catch {
+      toast.error("Error de conexión al eliminar");
+    } finally {
+      setDeletingMultiple(false);
+    }
+  };
+
+  const handleOpenMultiEdit = () => {
+    if (selectedSkus.length === 0) return;
+    setMultiEditOpen(true);
+  };
+
+  const selectedProductsList = useMemo(() => {
+    return items.filter((i) => selectedSkus.includes(i.producto));
+  }, [items, selectedSkus]);
 
   return (
-    <div className="w-full min-w-0 space-y-3 pb-24 relative">
+    <div className="w-full px-3 sm:px-6 space-y-4 pb-28">
+      {/* BARRA DE BÚSQUEDA Y ESCÁNER (STICKY TOP-0) */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md py-2.5 -mx-3 px-3 sm:-mx-6 sm:px-6 border-b border-border/40 shadow-2xs space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Buscar por SKU, glosa, rack, contenedor o grupo..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-10 pr-9 h-10 text-xs sm:text-sm rounded-xl bg-card border-border/60"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => handleSearchChange("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setScannerOpen(true)}
+            className="h-10 w-10 rounded-xl shrink-0 border-border/60 hover:bg-secondary bg-card"
+            title="Escanear código QR o barras"
+          >
+            <Barcode className="h-5 w-5 text-primary" />
+          </Button>
+
+          {isAdmin && (
+            <Button
+              type="button"
+              onClick={() => setNewProductOpen(true)}
+              className="h-10 text-xs font-bold gap-1.5 rounded-xl px-3.5 shrink-0 shadow-xs"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nuevo Producto</span>
+            </Button>
+          )}
+        </div>
+
+        {/* BARRA DE ACCIÓN MASIVA SI HAY ITEMS SELECCIONADOS */}
+        {selectedSkus.length > 0 && (
+          <div className="flex items-center justify-between p-2 rounded-xl bg-primary/10 border border-primary/30 animate-in fade-in slide-in-from-top-1 text-xs">
+            <div className="flex items-center gap-2 font-bold text-primary">
+              <CheckCircle2 className="h-4 w-4" />
+              <span>{selectedSkus.length} repuestos seleccionados</span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleOpenMultiEdit}
+                className="h-7.5 px-3 text-xs font-bold gap-1 rounded-lg border-primary/40 text-primary bg-background hover:bg-primary/10"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Editar ({selectedSkus.length})
+              </Button>
+
+              {isAdmin && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleDeleteSelected}
+                  disabled={deletingMultiple}
+                  className="h-7.5 px-3 text-xs font-bold gap-1 rounded-lg"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Eliminar ({selectedSkus.length})
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedSkus([])}
+                className="h-7.5 w-7.5 p-0 rounded-lg text-muted-foreground hover:text-foreground"
+                title="Deseleccionar todos"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SCANNER DIALOG */}
       <BarcodeScanner
         open={scannerOpen}
         onOpenChange={setScannerOpen}
-        onResult={(res) => {
-          const code = res.trim().toUpperCase();
-          setSearchQuery(code);
-          setScannerOpen(false);
-          setPage(1);
-          loadPage(code, 1, false);
-        }}
+        onResult={handleScanResult}
       />
 
-      {/* BUSCADOR UNIFICADO INTEGRADO (STICKY TOP) */}
-      <div className="sticky -top-3 sm:-top-5 z-30 bg-background/95 backdrop-blur-md pt-3 sm:pt-5 pb-2 -mx-3 sm:-mx-5 px-3 sm:px-5">
-        <Card className="border-border/60 shadow-sm">
-          <CardContent className="p-3 sm:p-3.5 space-y-2.5">
-            <div className="relative flex items-center w-full group">
-              {/* Botón de Escáner Código de Barras */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setScannerOpen(true)}
-                className="absolute left-1.5 h-9 w-9 text-muted-foreground hover:text-primary transition-colors z-10 rounded-lg"
-                title="Escanear con cámara"
-              >
-                <Barcode className="h-5 w-5" />
-              </Button>
+      {/* MODAL PARA CREAR NUEVO PRODUCTO */}
+      <NewProductDialog
+        open={newProductOpen}
+        onOpenChange={setNewProductOpen}
+        onProductCreated={() => loadPage(searchQuery, 1, false)}
+        catalogs={catalogs}
+      />
 
-              {/* Input Principal Unificado */}
-              <Input
-                value={searchQuery}
-                onChange={handleSearchInputChange}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                placeholder="Buscar SKU, descripción, familia o rack (ej: RPTS01, 801., etc.)..."
-                className="pl-12 pr-24 font-mono text-xs sm:text-sm h-12 rounded-xl bg-secondary/30 focus-visible:ring-2 focus-visible:ring-primary/40 transition-all border-border/50 group-focus-within:border-primary/40 group-focus-within:bg-background"
-                autoComplete="off"
-              />
+      {/* MODAL MULTI-TABS PARA EDITAR PRODUCTOS SELECCIONADOS */}
+      <MultiProductEditSheet
+        open={multiEditOpen}
+        onOpenChange={setMultiEditOpen}
+        products={selectedProductsList}
+        onSaved={() => {
+          setSelectedSkus([]);
+          loadPage(searchQuery, page, false);
+        }}
+        catalogs={catalogs}
+      />
 
-              {/* Acciones Derecha (Limpiar X y Botón Buscar) */}
-              <div className="absolute right-1.5 flex items-center gap-1">
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={handleClearSearch}
-                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
-                    title="Limpiar búsqueda"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-
-                <Button
-                  type="button"
-                  onClick={handleSearch}
-                  disabled={loading}
-                  size="sm"
-                  className="h-9 px-3 rounded-lg text-xs font-bold shadow-xs"
-                  title="Buscar"
-                >
-                  {loading ? <Loader2 className="animate-spin h-3.5 w-3.5" /> : <Search className="h-3.5 w-3.5" />}
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-              <span>
-                {loading ? "Cargando catálogo..." : `Mostrando ${items.length} de ${total} productos`}
-              </span>
-              <span className="font-mono font-semibold">{total} SKUs en sistema</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* LISTA / TABLA DE PRODUCTOS */}
+      {/* LISTA DE PRODUCTOS */}
       <Card className="border-border/60 shadow-xs overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="md:hidden">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="border-b border-border/20">
-                  <SkeletonCard />
-                </div>
+            <div className="grid grid-cols-1 divide-y divide-border/40">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <SkeletonCard key={i} />
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-              <Package className="h-8 w-8 opacity-30" />
-              <span className="text-xs">No se encontraron productos</span>
+            <div className="p-12 text-center space-y-3">
+              <Package className="h-12 w-12 text-muted-foreground/40 mx-auto" />
+              <p className="text-sm font-semibold text-foreground">No se encontraron productos</p>
+              <p className="text-xs text-muted-foreground">Intenta con otro término de búsqueda</p>
             </div>
           ) : (
             <>
-              {/* MOBILE VIEW (CARDS TACTILES CON BOTÓN DETALLE) */}
-              <div className="md:hidden divide-y divide-border/40">
+              {/* VISTA MÓVIL (CARDS INTERACTIVAS) */}
+              <div className="block sm:hidden divide-y divide-border/40">
                 {items.map((item) => {
-                  const inCart = cartItems.find((it) => it.producto === item.producto);
+                  const inCart = cartItems.find((ci) => ci.producto === item.producto);
+                  const isSelected = selectedSkus.includes(item.producto);
+                  const stockNum = Number(item.stock_total ?? 0);
 
                   return (
                     <div
                       key={item.producto}
-                      onClick={() => handleProductTap(item)}
-                      className={`p-3.5 space-y-2 hover:bg-secondary/20 active:bg-secondary/40 transition cursor-pointer ${
-                        inCart ? "bg-primary/5 border-l-4 border-l-primary" : ""
+                      onClick={() => handleProductCardClick(item)}
+                      className={`p-3.5 space-y-2 cursor-pointer transition-colors active:bg-secondary/40 ${
+                        isSelected
+                          ? "bg-primary/10 border-l-4 border-primary"
+                          : inCart
+                          ? "bg-primary/5 border-l-4 border-primary"
+                          : cartTipo === "INVENTARIO"
+                          ? "hover:bg-primary/10 bg-primary/5 border-l-4 border-primary"
+                          : "hover:bg-secondary/20"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
-                          <span className="font-mono font-bold text-xs bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-lg shrink-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div onClick={(e) => e.stopPropagation()} className="pt-0.5">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectSku(item.producto)}
+                              className="rounded-sm border-muted-foreground/40"
+                            />
+                          </div>
+                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
                             {item.producto}
                           </span>
                           {item.familia && (
-                            <Badge variant="outline" className="text-[9px] shrink-0">
+                            <Badge variant="outline" className="text-[10px] truncate max-w-[120px]">
                               {item.familia}
                             </Badge>
                           )}
                         </div>
-                        <Badge
-                          variant="secondary"
-                          className="font-mono font-bold text-xs shrink-0 ml-2"
-                        >
-                          Stock: {item.stock_total ?? 0} {item.unidad}
-                        </Badge>
-                      </div>
-                      <div className="text-xs font-semibold text-foreground truncate">{item.glosa || "-"}</div>
-                      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 text-muted-foreground" />
-                          Rack: <strong className="font-mono text-foreground">{item.rack || "Sin asignar"}</strong>
-                        </span>
 
-                        {inCart ? (
-                          <Badge className="bg-primary text-primary-foreground font-mono text-[10px] font-bold">
-                            En Vale: {inCart.cantidad} {item.unidad}
-                          </Badge>
-                        ) : cartTipo ? (
-                          <span className="text-primary font-bold text-xs flex items-center gap-1">
-                            <Plus className="h-3 w-3" /> Agregar
+                        <div className="flex items-center gap-1 text-right shrink-0">
+                          <span className="font-mono text-sm font-black text-foreground">
+                            {stockNum.toLocaleString()}
                           </span>
-                        ) : (
+                          <span className="text-[10px] font-semibold text-muted-foreground">
+                            {item.unidad || "UND"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-xs font-bold text-foreground line-clamp-2 leading-relaxed">
+                        {item.glosa}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-1 truncate max-w-[180px]">
+                          <MapPin className="h-3 w-3 text-primary shrink-0" />
+                          <span className="truncate font-semibold">{item.rack || "Sin asignar"}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDetail(item);
-                            }}
-                            className="h-6 px-2 text-[11px] font-bold text-primary hover:bg-primary/10 rounded-lg"
+                            onClick={(e) => handleStartQuickCountDirect(item, e)}
+                            className="h-7 px-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg gap-1"
+                            title="Conteo rápido con cronómetro"
                           >
-                            <FileText className="h-3 w-3 mr-1" />
-                            Detalle
+                            <ClipboardCheck className="h-3.5 w-3.5" />
+                            Contar
                           </Button>
-                        )}
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenDetail(item)}
+                            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* DESKTOP VIEW (TABLA FULL-WIDTH) */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead className="bg-secondary/50 border-b border-border/50 sticky top-0 z-10 backdrop-blur-sm">
+              {/* VISTA DESKTOP (TABLA CORPORATIVA 100% ANCHO CON CHECKBOX) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-secondary/30 text-muted-foreground uppercase text-[10px] font-bold tracking-wider border-b border-border/50">
                     <tr>
-                      <th className="text-left py-3 px-3.5 font-bold text-muted-foreground uppercase tracking-wider">SKU</th>
-                      <th className="text-left py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Descripción del Material</th>
-                      <th className="text-center py-3 px-2 font-bold text-muted-foreground uppercase tracking-wider">Unidad</th>
-                      <th className="text-center py-3 px-2 font-bold text-muted-foreground uppercase tracking-wider">Familia</th>
-                      <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Stock</th>
-                      <th className="text-center py-3 px-2 font-bold text-muted-foreground uppercase tracking-wider">Rack</th>
-                      {isAdmin && (
-                        <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Costo Unit.</th>
-                      )}
-                      <th className="text-center py-3 px-3 font-bold text-muted-foreground uppercase tracking-wider">Acciones</th>
+                      <th className="py-3 px-4 w-[40px]">
+                        <Checkbox
+                          checked={isAllSelected}
+                          onCheckedChange={toggleSelectAll}
+                          className="rounded-sm border-muted-foreground/40"
+                        />
+                      </th>
+                      <th className="py-3 px-3">SKU / Material</th>
+                      <th className="py-3 px-4">Descripción (Glosa)</th>
+                      <th className="py-3 px-3">Grupo / Familia</th>
+                      <th className="py-3 px-3">Almacén / Contenedor</th>
+                      <th className="py-3 px-3">Ubicación (Rack)</th>
+                      <th className="py-3 px-3 text-right">Stock Real</th>
+                      {isAdmin && <th className="py-3 px-3 text-center">Costo Unit.</th>}
+                      <th className="py-3 px-3 text-center">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/30">
+                  <tbody className="divide-y divide-border/40 font-medium">
                     {items.map((item) => {
-                      const inCart = cartItems.find((it) => it.producto === item.producto);
+                      const inCart = cartItems.find((ci) => ci.producto === item.producto);
+                      const isSelected = selectedSkus.includes(item.producto);
+                      const stockNum = Number(item.stock_total ?? 0);
 
                       return (
                         <tr
                           key={item.producto}
-                          onClick={() => handleProductTap(item)}
-                          className={`hover:bg-secondary/30 cursor-pointer transition ${
-                            inCart ? "bg-primary/5" : ""
+                          onClick={() => handleProductCardClick(item)}
+                          className={`cursor-pointer transition-colors ${
+                            isSelected
+                              ? "bg-primary/10 hover:bg-primary/15"
+                              : inCart
+                              ? "bg-primary/5 hover:bg-primary/10"
+                              : cartTipo === "INVENTARIO"
+                              ? "hover:bg-primary/10 bg-primary/5"
+                              : "hover:bg-secondary/20"
                           }`}
                         >
-                          <td className="py-2.5 px-3.5 font-mono font-bold text-primary whitespace-nowrap">{item.producto}</td>
-                          <td className="py-2.5 px-3 max-w-[280px] truncate font-medium text-foreground" title={item.glosa}>{item.glosa}</td>
-                          <td className="py-2.5 px-2 text-center text-[11px] font-semibold">{item.unidad}</td>
-                          <td className="py-2.5 px-2 text-center">
-                            <Badge variant="secondary" className="text-[9px]">{item.familia}</Badge>
+                          <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectSku(item.producto)}
+                              className="rounded-sm border-muted-foreground/40"
+                            />
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-black text-foreground">
-                            {item.stock_total ?? 0}
+                          <td className="py-2.5 px-3 font-mono font-bold text-primary">
+                            {item.producto}
                           </td>
-                          <td className="py-2.5 px-2 text-center font-mono text-[11px] text-muted-foreground">
-                            {item.rack || "-"}
+                          <td className="py-2.5 px-4 font-bold text-foreground max-w-sm truncate">
+                            {item.glosa}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <Badge variant="outline" className="text-[10px] truncate max-w-[130px]">
+                              {item.familia || "GENERAL"}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground truncate max-w-[140px]">
+                            {item.contenedor_nombre || "Almacén Central"}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="font-mono text-muted-foreground font-semibold">
+                              {item.rack || "Sin asignar"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-mono font-black text-foreground">
+                            {stockNum.toLocaleString()}{" "}
+                            <span className="text-[10px] font-normal text-muted-foreground">
+                              {item.unidad || "UND"}
+                            </span>
                           </td>
                           {isAdmin && (
                             <td className="py-2.5 px-3 text-center font-mono font-bold text-primary">
@@ -554,28 +957,38 @@ export default function ProductosPage() {
                           )}
                           <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-1.5">
-                              {inCart ? (
-                                <Badge className="bg-primary text-primary-foreground font-mono text-[10px] font-bold">
-                                  En Vale ({inCart.cantidad})
-                                </Badge>
-                              ) : (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10 rounded-lg"
-                                  onClick={() => handleOpenDetail(item)}
-                                >
-                                  <FileText className="h-3.5 w-3.5 mr-1" /> Detalle
-                                </Button>
-                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => handleStartQuickCountDirect(item, e)}
+                                className="h-7 px-2.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg gap-1"
+                                title="Conteo rápido con cronómetro"
+                              >
+                                <ClipboardCheck className="h-3.5 w-3.5" />
+                                Contar
+                              </Button>
+
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2.5 text-[11px] font-bold text-primary hover:bg-primary/10 rounded-lg"
+                                onClick={() => handleOpenDetail(item)}
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1" /> Detalle
+                              </Button>
+
                               {isAdmin && (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                                  onClick={() => startEdit(item)}
+                                  onClick={() => {
+                                    setSelectedSkus([item.producto]);
+                                    setMultiEditOpen(true);
+                                  }}
                                   title="Editar datos maestros"
                                 >
                                   <Edit3 className="h-3.5 w-3.5" />
@@ -590,65 +1003,47 @@ export default function ProductosPage() {
                 </table>
               </div>
 
-              {/* LOAD MORE */}
-              {hasMore && (
-                <div className="p-4 flex justify-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLoadMore}
-                    disabled={loadingMore}
-                    className="h-9 text-xs font-semibold gap-1.5 rounded-xl"
-                  >
-                    {loadingMore ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        Cargando más...
-                      </>
-                    ) : (
-                      <>
-                        Cargar más ({items.length} de {total})
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {!hasMore && items.length > 0 && (
-                <div className="p-3 text-center text-[10px] text-muted-foreground border-t border-border/30">
-                  Todos los productos cargados ({items.length} de {total})
-                </div>
-              )}
+              {/* PIE DE TABLA UNIFICADO (CARGAR 50 MÁS) */}
+              <TableLoadMore
+                currentCount={items.length}
+                totalCount={total}
+                hasMore={hasMore && items.length < total}
+                loadingMore={loadingMore}
+                onLoadMore={handleLoadMore}
+                itemName="productos"
+              />
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* FOOTER FLOTANTE */}
-      {!cartTipo ? (
-        <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2">
+      {/* FOOTER FLOTANTE CON LAS 3 ACCIONES DEL OPERARIO: CONTEO, INGRESO, SALIDA */}
+      {cartTipo === "INVENTARIO" ? (
+        <div className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 z-40 flex items-center justify-center gap-2 animate-in slide-in-from-bottom-3 duration-300">
+          <div className="h-12 sm:h-13 px-4 sm:px-5 rounded-2xl bg-primary text-primary-foreground shadow-2xl gap-3 font-bold text-xs sm:text-sm flex items-center justify-between flex-1 sm:flex-initial sm:min-w-[320px] border border-white/20">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 font-mono font-black text-xs shrink-0">
+                {inventarioCount}
+              </span>
+              <span className="truncate">
+                {inventarioCount === 0
+                  ? "Modo Inventario: Toca un repuesto para auditar"
+                  : `Modo Inventario: ${inventarioCount} repuestos auditados`}
+              </span>
+            </div>
+          </div>
           <Button
             type="button"
-            onClick={() => handleStartMode("INGRESO")}
-            className="h-11 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-600/30 gap-1.5 font-bold text-xs transition-transform active:scale-95 flex items-center"
-            title="Activar modo Ingreso"
+            variant="secondary"
+            size="icon"
+            onClick={cancelMovement}
+            className="h-12 sm:h-13 w-12 sm:w-13 rounded-2xl shadow-xl border border-border/60 bg-background/90 backdrop-blur-md text-muted-foreground hover:text-rose-500 shrink-0"
+            title="Finalizar / Salir del modo inventario"
           >
-            <Plus className="h-4 w-4" />
-            <span>Ingreso</span>
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => handleStartMode("SALIDA")}
-            className="h-11 px-3.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-600/30 gap-1.5 font-bold text-xs transition-transform active:scale-95 flex items-center"
-            title="Activar modo Salida"
-          >
-            <Minus className="h-4 w-4" />
-            <span>Salida</span>
+            <X className="h-5 w-5" />
           </Button>
         </div>
-      ) : (
+      ) : cartTipo === "INGRESO" || cartTipo === "SALIDA" ? (
         <div className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-6 z-40 flex items-center justify-center gap-2 animate-in slide-in-from-bottom-3 duration-300">
           <Button
             type="button"
@@ -686,6 +1081,41 @@ export default function ProductosPage() {
             <X className="h-5 w-5" />
           </Button>
         </div>
+      ) : (
+        <div className="fixed bottom-6 right-4 sm:right-6 z-40 flex items-center gap-2 animate-in fade-in duration-200">
+          {/* BOTÓN 1: CONTEO RÁPIDO */}
+          <Button
+            type="button"
+            onClick={() => handleStartMode("INVENTARIO")}
+            className="h-11 px-3.5 sm:px-4 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-xl shadow-primary/30 gap-1.5 font-bold text-xs transition-transform active:scale-95 flex items-center"
+            title="Activar modo Conteo / Inventario Continuo"
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            <span>Inventario</span>
+          </Button>
+
+          {/* BOTÓN 2: INGRESO */}
+          <Button
+            type="button"
+            onClick={() => handleStartMode("INGRESO")}
+            className="h-11 px-3.5 sm:px-4 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-xl shadow-emerald-600/30 gap-1.5 font-bold text-xs transition-transform active:scale-95 flex items-center"
+            title="Activar modo Ingreso"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Ingreso</span>
+          </Button>
+
+          {/* BOTÓN 3: SALIDA */}
+          <Button
+            type="button"
+            onClick={() => handleStartMode("SALIDA")}
+            className="h-11 px-3.5 sm:px-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-600/30 gap-1.5 font-bold text-xs transition-transform active:scale-95 flex items-center"
+            title="Activar modo Salida"
+          >
+            <Minus className="h-4 w-4" />
+            <span>Salida</span>
+          </Button>
+        </div>
       )}
 
       {/* PANTALLA COMPLETA DE DETALLE DEL PRODUCTO */}
@@ -711,9 +1141,22 @@ export default function ProductosPage() {
         onOpenChange={setSelectorOpen}
         product={selectorProduct}
         defaultTipo={defaultSelectorTipo}
-        lockedTipo={cartTipo}
+        lockedTipo={cartTipo === "INVENTARIO" ? null : cartTipo}
         onAdd={(prod, cant, tipo) => {
           return addItem(prod, cant, tipo);
+        }}
+      />
+
+      {/* MODAL DE CONTEO RÁPIDO DIRECTO DESDE LISTA */}
+      <QuickCountDialog
+        open={quickCountOpen}
+        onOpenChange={setQuickCountOpen}
+        product={quickCountProduct}
+        onSaved={() => {
+          if (cartTipo === "INVENTARIO") {
+            incrementInventarioCount();
+          }
+          loadPage(searchQuery, page, false);
         }}
       />
 
@@ -721,7 +1164,7 @@ export default function ProductosPage() {
       <MovementCartSheet
         open={cartSheetOpen}
         onOpenChange={setCartSheetOpen}
-        tipo={cartTipo}
+        tipo={cartTipo === "INVENTARIO" ? null : cartTipo}
         items={cartItems}
         token={getToken()}
         usuarioId={user?.id}
@@ -734,23 +1177,33 @@ export default function ProductosPage() {
         }}
       />
 
-      {/* EDIT DIALOG (SOLO ADMIN) */}
+      {/* EDIT DIALOG CON JERARQUÍA COMPLETA BODEGA -> CONTENEDOR -> RACK -> POSICIÓN */}
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
-        <DialogContent aria-describedby={undefined} className="fixed inset-0 z-50 w-full h-full translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto sm:fixed sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:h-auto sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:p-6 sm:shadow-lg">
-          <DialogHeader className="p-4 sm:p-0 sm:pb-2 border-b sm:border-b-0 sticky top-0 bg-background z-10">
-            <DialogTitle className="text-base sm:text-lg">
-              Editando Producto
-            </DialogTitle>
-            <p className="text-xs text-muted-foreground font-mono mt-0.5">{editingItem?.producto}</p>
+        <DialogContent aria-describedby={undefined} className="fixed inset-0 z-50 w-full h-full translate-x-0 translate-y-0 rounded-none border-0 p-0 overflow-y-auto sm:fixed sm:inset-auto sm:left-[50%] sm:top-[50%] sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-2xl sm:border sm:p-6 sm:shadow-2xl bg-background">
+          <DialogHeader className="p-4 sm:p-0 sm:pb-3 border-b sm:border-b-0 sticky top-0 bg-background z-10">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-base sm:text-lg font-bold">
+                  Editar Datos Maestros (SAP MM)
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                  SKU: {editingItem?.producto} — {editingItem?.glosa}
+                </p>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="px-4 sm:px-0 py-4 space-y-4">
+          <div className="px-4 sm:px-0 py-2 space-y-4">
             {editingItem && (
-              <EditFields form={editForm} onChange={handleFieldChange} />
+              <EditFields
+                form={editForm}
+                onChange={handleFieldChange}
+                catalogs={catalogs}
+              />
             )}
           </div>
 
-          <DialogFooter className="p-4 sm:p-0 sm:pt-2 border-t sm:border-t-0 sticky bottom-0 bg-background z-10 flex-row gap-2">
+          <DialogFooter className="p-4 sm:p-0 sm:pt-3 border-t sm:border-t-0 sticky bottom-0 bg-background z-10 flex-row gap-2">
             <Button
               type="button"
               variant="outline"
@@ -764,10 +1217,10 @@ export default function ProductosPage() {
               type="button"
               onClick={() => editingItem && saveProduct(editingItem.producto)}
               disabled={saving}
-              className="h-10 text-xs font-bold gap-1.5 rounded-xl flex-1 sm:flex-none"
+              className="h-10 text-xs font-bold gap-1.5 rounded-xl flex-1 sm:flex-none bg-primary text-primary-foreground"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              Guardar
+              Guardar Cambios
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -109,17 +109,20 @@ export function IRAContent() {
   const [loading, setLoading] = useState(true);
 
   const loadIRA = useCallback(async () => {
+    setLoading(true);
     try {
-      const raw = localStorage.getItem("mro_auth");
+      const raw = typeof window !== "undefined" ? localStorage.getItem("mro_auth") : null;
       const token = raw ? JSON.parse(raw).token : "";
       const res = await fetch("/api/dashboard/ira", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
-      setKpis(data.kpis);
-      setPorFamilia(data.porFamilia2 || []);
-      setTopImpacto(data.topImpacto || []);
-      setCausaRaiz(data.causaRaiz || []);
+      if (data.kpis) {
+        setKpis(data.kpis);
+        setPorFamilia(data.porFamilia2 || []);
+        setTopImpacto(data.topImpacto || []);
+        setCausaRaiz(data.causaRaiz || []);
+      }
     } catch {
       toast.error("Error al cargar datos IRA");
     } finally {

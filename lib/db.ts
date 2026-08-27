@@ -52,6 +52,156 @@ function initSchema(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now', '-5 hours'))
     );
 
+    -- ─────────────────────────────────────────────────────────────
+    -- NUEVA ARQUITECTURA NORMALIZADA SAP MM/WM & AUDITORÍA
+    -- ─────────────────────────────────────────────────────────────
+
+    -- 1. UNIDADES DE MEDIDA (SAP T006 / MEINS)
+    CREATE TABLE IF NOT EXISTS unidades_medida (
+      codigo_unidad TEXT PRIMARY KEY,        -- 'UND', 'PAR', 'CJA', 'CIEN', 'GL', 'MTR', 'KG'
+      codigo_sap TEXT DEFAULT '',            -- 'ST', 'PA', 'BX', 'C1', 'GL', 'M', 'KG'
+      nombre TEXT NOT NULL,                  -- 'Unidades', 'Pares', 'Cajas', etc.
+      simbolo TEXT DEFAULT '',
+      permite_decimales INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER DEFAULT 0
+    );
+
+    -- 2. GRUPO DE ARTÍCULOS / FAMILIAS (SAP T023 / MATKL)
+    CREATE TABLE IF NOT EXISTS grupos_articulos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT UNIQUE NOT NULL,           -- 'EPP', 'HERR', 'REP_MEC', 'REP_ELEC', 'CONS', 'ACC'
+      nombre TEXT NOT NULL,                  -- 'EPP', 'HERRAMIENTAS', 'REPUESTOS', etc.
+      descripcion TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER DEFAULT 0
+    );
+
+    -- 3. SUBFAMILIAS / LÍNEAS TÉCNICAS
+    CREATE TABLE IF NOT EXISTS subfamilias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      grupo_articulo_id INTEGER NOT NULL REFERENCES grupos_articulos(id),
+      codigo TEXT NOT NULL,                  -- 'RODAM', 'ABRAZ', 'PERN', 'FILT'
+      nombre TEXT NOT NULL,                  -- 'RODAMIENTOS', 'ABRAZADERAS', 'PERNERÍA'
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER DEFAULT 0
+    );
+
+    -- 4. BODEGAS / ALMACENES PRINCIPALES (SAP T001L / LGORT)
+    CREATE TABLE IF NOT EXISTS bodegas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT UNIQUE NOT NULL,           -- 'MRO-CHILCA', 'ALM-CENTRAL', 'ALM-MATPRIMA'
+      nombre TEXT NOT NULL,                  -- 'ALM MRO CHILCA'
+      empresa_codigo TEXT DEFAULT '001',
+      direccion TEXT DEFAULT 'Planta Chilca, Cañete',
+      activo INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER DEFAULT 0
+    );
+
+    -- 5. CONTENEDORES Y TIPOS DE ALMACÉN (SAP T301 / LGTYP)
+    CREATE TABLE IF NOT EXISTS contenedores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bodega_id INTEGER DEFAULT 1 REFERENCES bodegas(id),
+      codigo_contenedor TEXT UNIQUE NOT NULL, -- 'CONT-01', 'CONT-02', 'C.C.01', 'ALM-CENTRAL'
+      nombre TEXT NOT NULL,                   -- 'Contenedor 1 - EPPs y Herramientas'
+      zona TEXT DEFAULT '',                   -- 'PATIO NORTE', 'NAVE PRINCIPAL'
+      descripcion TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER DEFAULT 0
+    );
+
+    -- 6. TIPOS DE ALMACENAMIENTO FÍSICO
+    CREATE TABLE IF NOT EXISTS tipos_almacenamiento (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT UNIQUE NOT NULL,           -- 'SUELTO', 'GAVETA', 'EPP', 'CAJA', 'PALLET'
+      nombre TEXT NOT NULL,
+      descripcion TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER DEFAULT 0
+    );
+
+    -- 6. MAESTRO PRINCIPAL DE PRODUCTOS / MATERIALES (SAP MARA / MARD / MBEW)
+    CREATE TABLE IF NOT EXISTS productos (
+      sku TEXT PRIMARY KEY,                  -- SAP MATNR: Código Material (ej: '801.02.134')
+      glosa TEXT NOT NULL,                   -- SAP MAKTX: Descripción del Material
+      
+      unidad_codigo TEXT NOT NULL DEFAULT 'UND' REFERENCES unidades_medida(codigo_unidad),
+      grupo_articulo_id INTEGER REFERENCES grupos_articulos(id),
+      subfamilia_id INTEGER REFERENCES subfamilias(id),
+      tipo_almacenamiento_id INTEGER REFERENCES tipos_almacenamiento(id),
+      contenedor_id INTEGER REFERENCES contenedores(id),
+
+      -- Ubicación Física en Bodega (SAP LGPLA / LGPBE)
+      rack TEXT DEFAULT '',                  -- 'RACK 1', 'RACK 2'
+      nivel_rack TEXT DEFAULT '',            -- 'NIVEL 1', 'NIVEL 2', 'NIVEL 3', 'PISO'
+      posicion_detalle TEXT DEFAULT '',      -- 'GAVETA 14', 'CAJA B-02'
+      almacenamiento_codigo TEXT DEFAULT 'C.C.01', -- Centro de Costos / Almacén
+      
+      -- Valorización Actual (SAP MBEW)
+      costo_unitario_actual REAL DEFAULT 0,  -- SAP VERPR: Costo Unitario en Soles
+      moneda TEXT NOT NULL DEFAULT 'PEN',    -- SAP WAERS: 'PEN', 'USD'
+
+      -- Ficha Técnica y Dimensiones
+      foto_url TEXT,                         -- Fotografía oficial del repuesto
+      peso_neto REAL DEFAULT 0,              -- SAP NTGEW: Peso unitario (kg)
+      stock_seguridad_min REAL DEFAULT 0,    -- SAP EISBE: Punto de pedido / Stock mínimo
+      stock_maximo REAL DEFAULT 0,           -- SAP MABST: Stock máximo permitido
+      
+      -- Atributos Metalmecánicos Especiales (MRO)
+      tipo_acero TEXT DEFAULT '',
+      grado_acero TEXT DEFAULT '',
+      espesor_acero TEXT DEFAULT '',
+
+      -- Auditoría Completa
+      activo INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', '-5 hours')),
+      updated_by INTEGER REFERENCES usuarios(id),
+      is_deleted INTEGER NOT NULL DEFAULT 0,
+      deleted_at TEXT,
+      deleted_by INTEGER REFERENCES usuarios(id)
+    );
+
+    -- 7. HISTORIAL DE PRECIOS / COSTOS POR PERIODO (SAP MBEW Historial)
+    CREATE TABLE IF NOT EXISTS producto_costos_historial (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      producto_sku TEXT NOT NULL REFERENCES productos(sku),
+      costo_unitario REAL NOT NULL,          -- SAP VERPR
+      moneda TEXT NOT NULL DEFAULT 'PEN',    -- SAP WAERS
+      
+      fecha_validez_desde TEXT NOT NULL,     -- Fecha inicio vigencia (YYYY-MM-DD)
+      fecha_validez_hasta TEXT,              -- NULL: Costo activo actualmente
+      
+      motivo_modificacion TEXT DEFAULT '',   -- 'Recepción OC #9812', 'Actualización Inicial'
+      documento_referencia TEXT DEFAULT '',  -- Factura, Guía o Pedido de Compra
+      
+      created_at TEXT NOT NULL DEFAULT (datetime('now', '-5 hours')),
+      created_by INTEGER REFERENCES usuarios(id)
+    );
+
+    -- ─────────────────────────────────────────────────────────────
+    -- TABLAS LEGACY MANTENIDAS PARA COMPATIBILIDAD TRANSITORIA
+    -- ─────────────────────────────────────────────────────────────
     CREATE TABLE IF NOT EXISTS productos_master (
       producto TEXT PRIMARY KEY,
       glosa TEXT DEFAULT '',
@@ -114,6 +264,10 @@ function initSchema(db: Database.Database) {
       condiciones_almacenamiento TEXT DEFAULT '',
       foto_path TEXT,
       usuario_id INTEGER,
+      fecha_inicio TEXT,
+      fecha_fin TEXT,
+      duracion_segundos INTEGER DEFAULT 0,
+      estado_auditoria TEXT DEFAULT 'CONFORME',
       synced INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now', '-5 hours')),
       updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
@@ -148,17 +302,26 @@ function initSchema(db: Database.Database) {
       comentario TEXT DEFAULT '',
       usuario_id INTEGER NOT NULL,
       created_at TEXT DEFAULT (datetime('now', '-5 hours')),
-      FOREIGN KEY (producto) REFERENCES productos_master(producto),
+      FOREIGN KEY (producto) REFERENCES productos(sku),
       FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
     );
   `);
 
   ensureIndexes(db);
-  migrateOldSchema(db);
 }
 
 function ensureIndexes(db: Database.Database) {
   db.exec(`
+    -- Índices nuevas tablas SAP MM
+    CREATE INDEX IF NOT EXISTS idx_productos_sku ON productos(sku);
+    CREATE INDEX IF NOT EXISTS idx_productos_glosa ON productos(glosa);
+    CREATE INDEX IF NOT EXISTS idx_productos_grupo ON productos(grupo_articulo_id);
+    CREATE INDEX IF NOT EXISTS idx_productos_contenedor ON productos(contenedor_id);
+    CREATE INDEX IF NOT EXISTS idx_productos_rack ON productos(rack);
+    CREATE INDEX IF NOT EXISTS idx_costos_hist_sku ON producto_costos_historial(producto_sku);
+    CREATE INDEX IF NOT EXISTS idx_costos_hist_fechas ON producto_costos_historial(fecha_validez_desde, fecha_validez_hasta);
+
+    -- Índices existentes
     CREATE INDEX IF NOT EXISTS idx_stock_producto ON stock_cache(producto);
     CREATE INDEX IF NOT EXISTS idx_stock_lote ON stock_cache(lote);
     CREATE INDEX IF NOT EXISTS idx_inventario_producto ON inventario(producto);
@@ -170,118 +333,37 @@ function ensureIndexes(db: Database.Database) {
   `);
 }
 
-function migrateOldSchema(db: Database.Database) {
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[];
-  const tableNames = tables.map(t => t.name);
+/**
+ * Calcula el Stock Teórico Real y Dinámico de un repuesto consolidando conteo base y movimientos del Kárdex
+ */
+export function getStockTeorico(db: Database.Database, sku: string, lote = ''): number {
+  const cleanSKU = sku.trim().toUpperCase();
+  const cleanLote = (lote || '').trim();
 
-  const stockCols = tableNames.includes('stock_cache')
-    ? (db.prepare("PRAGMA table_info(stock_cache)").all() as { name: string }[]).map(c => c.name)
-    : [];
-  const invCols = tableNames.includes('inventario')
-    ? (db.prepare("PRAGMA table_info(inventario)").all() as { name: string }[]).map(c => c.name)
-    : [];
+  // 1. Stock base: último conteo físico o stock de cache
+  const invRow = db.prepare(`
+    SELECT cantidad_fisica 
+    FROM inventario 
+    WHERE producto = ? AND IFNULL(lote, '') = ?
+  `).get(cleanSKU, cleanLote) as { cantidad_fisica: number } | undefined;
 
-  const needsStockMigration = stockCols.includes('glosa') || stockCols.includes('subfamilia');
-  const needsInvMigration = invCols.includes('descripcion') || invCols.includes('stock_sistema');
+  const cacheRow = db.prepare(`
+    SELECT stock 
+    FROM stock_cache 
+    WHERE producto = ? AND IFNULL(lote, '') = ?
+  `).get(cleanSKU, cleanLote) as { stock: number } | undefined;
 
-  if (!needsStockMigration && !needsInvMigration) return;
+  const baseStock = invRow?.cantidad_fisica ?? cacheRow?.stock ?? 0;
 
-  db.pragma('foreign_keys = OFF');
+  // 2. Sumatoria de movimientos transaccionales posteriores
+  const movRow = db.prepare(`
+    SELECT 
+      COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END), 0) as ingresos,
+      COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END), 0) as salidas
+    FROM movimientos
+    WHERE producto = ? AND IFNULL(lote, '') = ?
+  `).get(cleanSKU, cleanLote) as { ingresos: number; salidas: number };
 
-  try {
-    db.transaction(() => {
-      if (needsStockMigration) {
-        const colList = stockCols.filter(c =>
-          ['producto', 'glosa', 'unidad', 'familia', 'subfamilia', 'tipo', 'peso', 'tipo_acero', 'grado_acero', 'espesor_acero', 'peso_producto'].includes(c)
-        );
-        if (colList.length > 0) {
-          const sel = colList.join(', ');
-          db.exec(`INSERT OR IGNORE INTO productos_master (producto, ${sel})
-            SELECT ${sel} FROM stock_cache`);
-        }
-
-        db.exec(`CREATE TABLE stock_cache_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          empresa TEXT DEFAULT '', bodega TEXT DEFAULT '', ubicacion TEXT DEFAULT '',
-          lote TEXT DEFAULT '', producto TEXT NOT NULL,
-          stock REAL DEFAULT 0, ultimo_ingreso TEXT,
-          fecha_sync TEXT DEFAULT (datetime('now', '-5 hours')),
-          UNIQUE(lote, producto)
-        )`);
-
-        const migrateCols = ['id', 'empresa', 'bodega', 'ubicacion', 'lote', 'producto', 'stock', 'ultimo_ingreso', 'fecha_sync']
-          .filter(c => stockCols.includes(c));
-        db.exec(`INSERT INTO stock_cache_new (${migrateCols.join(', ')})
-          SELECT ${migrateCols.join(', ')} FROM stock_cache`);
-        db.exec(`DROP TABLE stock_cache`);
-        db.exec(`ALTER TABLE stock_cache_new RENAME TO stock_cache`);
-      }
-
-      if (needsInvMigration) {
-        db.exec(`CREATE TABLE inventario_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          producto TEXT NOT NULL, lote TEXT DEFAULT '', familia2 TEXT DEFAULT '',
-          cantidad_fisica REAL DEFAULT 0, dif REAL DEFAULT 0, um TEXT DEFAULT '',
-          presentacion TEXT DEFAULT '', n_cajas_bultos TEXT DEFAULT '',
-          largo REAL DEFAULT 0, ancho REAL DEFAULT 0, alto REAL DEFAULT 0,
-          peso_total_cant_fisica REAL DEFAULT 0,
-          observacion TEXT DEFAULT 'PENDIENTE', comentario TEXT DEFAULT '',
-          rack TEXT DEFAULT '', ubicacion_actual TEXT DEFAULT '',
-          almacenamiento TEXT DEFAULT '', contenedor TEXT DEFAULT '',
-          responsable TEXT DEFAULT '', fecha_conteo TEXT DEFAULT '',
-          total_costo REAL DEFAULT 0, s_dif REAL DEFAULT 0,
-          rotacion TEXT DEFAULT '', linea TEXT DEFAULT '', prioridad TEXT DEFAULT '',
-          vida_util_ssoma TEXT DEFAULT '', compatibilidad_segregacion TEXT DEFAULT '',
-          condiciones_almacenamiento TEXT DEFAULT '', foto_path TEXT,
-          usuario_id INTEGER, synced INTEGER DEFAULT 0,
-          created_at TEXT DEFAULT (datetime('now', '-5 hours')),
-          updated_at TEXT DEFAULT (datetime('now', '-5 hours')),
-          UNIQUE(producto, lote),
-          FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-        )`);
-
-        const migrateInvCols = ['id', 'producto', 'lote', 'familia2', 'cantidad_fisica', 'dif', 'um',
-          'presentacion', 'n_cajas_bultos', 'largo', 'ancho', 'alto',
-          'peso_total_cant_fisica', 'observacion', 'comentario',
-          'rack', 'ubicacion_actual', 'almacenamiento', 'contenedor',
-          'responsable', 'fecha_conteo', 'total_costo', 's_dif',
-          'rotacion', 'linea', 'prioridad', 'vida_util_ssoma',
-          'compatibilidad_segregacion', 'condiciones_almacenamiento', 'foto_path',
-          'usuario_id', 'synced', 'created_at', 'updated_at'
-        ].filter(c => invCols.includes(c));
-
-        db.exec(`INSERT INTO inventario_new (${migrateInvCols.join(', ')})
-          SELECT ${migrateInvCols.join(', ')} FROM inventario`);
-        db.exec(`DROP TABLE inventario`);
-        db.exec(`ALTER TABLE inventario_new RENAME TO inventario`);
-      }
-
-      // Migrate usuarios to include new roles
-      const userCols = tableNames.includes('usuarios')
-        ? (db.prepare("PRAGMA table_info(usuarios)").all() as { name: string }[]).map(c => c.name)
-        : [];
-      if (userCols.length > 0) {
-        db.exec(`CREATE TABLE usuarios_new (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nombre TEXT NOT NULL,
-          usuario TEXT UNIQUE NOT NULL,
-          password_hash TEXT NOT NULL,
-          rol TEXT NOT NULL CHECK(rol IN ('contador', 'admin', 'almacenero', 'auditor')),
-          activo INTEGER DEFAULT 1,
-          created_at TEXT DEFAULT (datetime('now', '-5 hours'))
-        )`);
-        
-        const migrateUserCols = ['id', 'nombre', 'usuario', 'password_hash', 'rol', 'activo', 'created_at'].filter(c => userCols.includes(c));
-        db.exec(`INSERT INTO usuarios_new (${migrateUserCols.join(', ')})
-          SELECT ${migrateUserCols.join(', ')} FROM usuarios`);
-        db.exec(`UPDATE usuarios_new SET rol = 'almacenero' WHERE rol = 'contador'`);
-        db.exec(`DROP TABLE usuarios`);
-        db.exec(`ALTER TABLE usuarios_new RENAME TO usuarios`);
-      }
-
-      ensureIndexes(db);
-    });
-  } finally {
-    db.pragma('foreign_keys = ON');
-  }
+  return baseStock + movRow.ingresos - movRow.salidas;
 }
+

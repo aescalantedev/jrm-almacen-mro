@@ -93,32 +93,37 @@ export default function DashboardPage() {
   const [topDiferencias, setTopDiferencias] = useState<TopDifItem[]>([]);
   const [porUsuario, setPorUsuario] = useState<UsuarioStats[]>([]);
   const [ultimos, setUltimos] = useState<Registro[]>([]);
-  const [lastSync, setLastSync] = useState<{ fecha: string; registros_sync: number } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "ira" | "movimientos">("general");
 
   const { user, token, isLoading: authLoading } = useAuth();
 
   const loadDashboard = useCallback(async () => {
-    if (!token) return;
+    setLoading(true);
     try {
-      const [dashRes, syncRes] = await Promise.all([
-        fetch("/api/admin", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/sync", { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+      const raw = typeof window !== "undefined" ? localStorage.getItem("mro_auth") : null;
+      const currentToken = token || (raw ? JSON.parse(raw).token : "");
+
+      const dashRes = await fetch("/api/admin", {
+        headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {},
+      });
       const dashData = await dashRes.json();
-      const syncData = await syncRes.json();
-      setStats(dashData.stats);
-      setPorFamilia(dashData.porFamilia || []);
-      setPorEstado(dashData.porEstado || []);
-      setTopDiferencias(dashData.topDiferencias || []);
-      setPorUsuario(dashData.porUsuario || []);
-      setUltimos(dashData.ultimosRegistros || []);
-      setLastSync(syncData.lastSync || null);
-    } catch {
-      toast.error("Error al cargar dashboard");
+      if (dashData.error) {
+        console.warn("[Dashboard API warning]:", dashData.error);
+        toast.error(`Aviso: ${dashData.error}`);
+      }
+      if (dashData.stats) {
+        setStats(dashData.stats);
+        setPorFamilia(dashData.porFamilia || []);
+        setPorEstado(dashData.porEstado || []);
+        setTopDiferencias(dashData.topDiferencias || []);
+        setPorUsuario(dashData.porUsuario || []);
+        setUltimos(dashData.ultimosRegistros || []);
+      }
+    } catch (err: unknown) {
+      console.error("Error al cargar dashboard:", err);
+      toast.error(err instanceof Error ? err.message : "Error al cargar dashboard");
     } finally {
       setLoading(false);
     }
@@ -127,29 +132,6 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const raw = localStorage.getItem("mro_auth");
-      const token = raw ? JSON.parse(raw).token : "";
-      const res = await fetch("/api/sync", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(`Sincronización completada: ${data.registros} registros`);
-        loadDashboard();
-      } else {
-        toast.error(`Error: ${data.error}`);
-      }
-    } catch {
-      toast.error("Error de conexión al sincronizar");
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const handleExportExcel = async () => {
     setExporting(true);
@@ -279,16 +261,13 @@ export default function DashboardPage() {
 
           <Button
             type="button"
-            onClick={handleSync}
-            disabled={syncing}
-            className="h-9 text-xs font-bold gap-2 rounded-xl shadow-sm"
+            variant="outline"
+            onClick={loadDashboard}
+            className="h-9 text-xs font-bold gap-2 rounded-xl border-border/60 hover:bg-secondary"
+            title="Recargar datos del dashboard"
           >
-            {syncing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
-            {syncing ? "Sincronizando..." : "Sincronizar Stock"}
+            <RefreshCw className="h-3.5 w-3.5" />
+            Actualizar
           </Button>
         </div>
       </div>
@@ -550,15 +529,15 @@ export default function DashboardPage() {
           <CardContent className="p-0">
             <div className="overflow-x-auto max-h-[360px]">
               <table className="w-full text-xs">
-                <thead className="bg-secondary/40 border-b border-border/40 sticky top-0 z-10 backdrop-blur-sm">
+                <thead className="bg-secondary/30 border-b border-border/50 sticky top-0 z-10 backdrop-blur-sm">
                   <tr>
-                    <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">SKU</th>
-                    <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">Descripción</th>
-                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Sis.</th>
-                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Fís.</th>
-                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">DIF</th>
-                    <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Ubicación</th>
-                    <th className="text-center py-2.5 px-3 font-bold text-muted-foreground uppercase">Estado</th>
+                    <th className="text-left py-2.5 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">SKU</th>
+                    <th className="text-left py-2.5 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Descripción</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Sistema</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Físico</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">DIF</th>
+                    <th className="text-center py-2.5 px-2 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Ubicación</th>
+                    <th className="text-center py-2.5 px-3 font-bold text-[10px] text-muted-foreground uppercase tracking-wider">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
@@ -641,18 +620,16 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Sync Status Card */}
+          {/* Database Status Card */}
           <Card className="border-border/60 shadow-xs">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                 <Database className="h-5 w-5" />
               </div>
               <div className="space-y-0.5">
-                <p className="text-xs font-bold text-foreground">Sincronización Flexline</p>
+                <p className="text-xs font-bold text-foreground">Base de Datos MRO</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {lastSync
-                    ? `${new Date(lastSync.fecha).toLocaleString("es-PE")} (${lastSync.registros_sync} SKUs)`
-                    : "Base de datos local actualizada"}
+                  Catálogo maestro y kárdex operativo independiente
                 </p>
               </div>
             </CardContent>
