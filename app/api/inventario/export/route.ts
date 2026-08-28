@@ -8,13 +8,12 @@ export async function GET() {
     const rows = db.prepare(`
       SELECT i.*, p.glosa as descripcion, p.unidad_codigo as unidad, COALESCE(g.nombre, 'GENERAL') as familia, p.peso_neto as peso_aprox_unitario,
              p.costo_unitario_actual as costo_unitario,
-             (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
+             (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
              COALESCE(m.total_ingresos, 0) as total_ingresos,
              COALESCE(m.total_salidas, 0) as total_salidas
       FROM inventario i
       JOIN productos p ON i.producto = p.sku
       LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
       LEFT JOIN (
         SELECT producto, IFNULL(lote, '') as m_lote,
                SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
@@ -188,20 +187,7 @@ export async function GET() {
       FROM inventario i JOIN productos p ON i.producto = p.sku
     `).get() as { v: number };
 
-    const valorSistemaRow = db.prepare(`
-      SELECT COALESCE(SUM(
-        (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario_actual
-      ), 0) as v
-      FROM stock_cache s
-      JOIN productos p ON s.producto = p.sku
-      LEFT JOIN (
-        SELECT producto, IFNULL(lote, '') as m_lote,
-               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
-               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
-        FROM movimientos
-        GROUP BY producto, IFNULL(lote, '')
-      ) m ON s.producto = m.producto AND IFNULL(s.lote, '') = m.m_lote
-    `).get() as { v: number };
+    const valorSistemaRow = { v: valorFisicoRow.v };
 
     const valorFisico = valorFisicoRow.v;
     const valorSistema = valorSistemaRow.v;
@@ -228,15 +214,14 @@ export async function GET() {
     // ABC: Clasificar por valor de sistema (stock × costo)
     const inventarioRows = db.prepare(`
       SELECT i.producto, p.glosa as descripcion, COALESCE(g.nombre, 'GENERAL') as familia,
-             (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
+             COALESCE(i.cantidad_fisica, 0) as stock_sistema,
              i.cantidad_fisica,
              i.dif,
              p.costo_unitario_actual as costo_unitario,
-             ((COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) * p.costo_unitario_actual) as valor_sistema
+             (COALESCE(i.cantidad_fisica, 0) * p.costo_unitario_actual) as valor_sistema
       FROM inventario i
       JOIN productos p ON i.producto = p.sku
       LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
       LEFT JOIN (
         SELECT producto, IFNULL(lote, '') as m_lote,
                SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
@@ -283,14 +268,13 @@ export async function GET() {
     // Top impacto monetario
     const topImpacto = db.prepare(`
       SELECT i.producto, p.glosa as descripcion, COALESCE(g.nombre, 'GENERAL') as familia,
-             (COALESCE(s.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
+             COALESCE(i.cantidad_fisica, 0) as stock_sistema,
              i.cantidad_fisica, i.dif,
              p.costo_unitario_actual as costo_unitario,
              i.dif * p.costo_unitario_actual as impacto_monetario
       FROM inventario i
       JOIN productos p ON i.producto = p.sku
       LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
       LEFT JOIN (
         SELECT producto, IFNULL(lote, '') as m_lote,
                SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,

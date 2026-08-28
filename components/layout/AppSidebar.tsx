@@ -17,6 +17,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -41,19 +42,24 @@ export function AppSidebar() {
   const { user } = useAuth();
 
   const filteredGroups = navigationGroups
-    .map(group => {
+    .map((group) => {
       // Si el grupo tiene items, filtramos sus items por rol
       if (group.items) {
         return {
           ...group,
-          items: group.items.filter(item => !item.roles || (user?.rol && item.roles.includes(user.rol)))
+          items: group.items.filter(
+            (item) =>
+              !item.roles || (user?.rol && item.roles.includes(user.rol)),
+          ),
         };
       }
       return group;
     })
-    .filter(group => {
+    .filter((group) => {
       if (!group.roles) return group.items.length > 0;
-      return user?.rol && group.roles.includes(user.rol) && group.items.length > 0;
+      return (
+        user?.rol && group.roles.includes(user.rol) && group.items.length > 0
+      );
     });
 
   return (
@@ -68,7 +74,7 @@ export function AppSidebar() {
           </span>
         </Link>
       </SidebarHeader>
-      
+
       <SidebarContent className="gap-0 scrollbar-none">
         {filteredGroups.map((group) => (
           <SidebarGroup key={group.label}>
@@ -77,8 +83,8 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarMenu className="px-2 gap-1">
               {group.items.map((item) => {
-                const isGroupActive = item.items 
-                  ? item.items.some(sub => sub.url === pathname)
+                const isGroupActive = item.items
+                  ? item.items.some((sub) => sub.url === pathname)
                   : pathname === item.url;
 
                 return (
@@ -89,24 +95,29 @@ export function AppSidebar() {
                         <SidebarMenuItem>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <SidebarMenuButton 
+                              <SidebarMenuButton
                                 tooltip={item.title}
                                 isActive={isGroupActive}
                                 className={cn(
                                   "h-10 rounded-lg transition-all duration-200",
-                                  isGroupActive && "bg-primary/5 text-primary font-bold"
+                                  isGroupActive &&
+                                    "bg-primary/5 text-primary font-bold",
                                 )}
                               >
-                                <item.icon className={cn(
-                                  "h-[18px] w-[18px]",
-                                  isGroupActive ? "text-primary" : "text-muted-foreground"
-                                )} />
+                                <item.icon
+                                  className={cn(
+                                    "h-[18px] w-[18px]",
+                                    isGroupActive
+                                      ? "text-primary"
+                                      : "text-muted-foreground",
+                                  )}
+                                />
                               </SidebarMenuButton>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent 
-                              side="right" 
-                              align="start" 
-                              sideOffset={20} 
+                            <DropdownMenuContent
+                              side="right"
+                              align="start"
+                              sideOffset={20}
                               className="min-w-56 rounded-xl border-border/50 shadow-xl bg-popover/95 backdrop-blur-md p-1 z-[100]"
                             >
                               <div className="px-3 py-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-border/40 mb-1">
@@ -114,21 +125,27 @@ export function AppSidebar() {
                               </div>
                               {item.items.map((subItem) => (
                                 <DropdownMenuItem key={subItem.title} asChild>
-                                  <Link 
-                                    href={subItem.url} 
+                                  <Link
+                                    href={subItem.url}
                                     className={cn(
                                       "flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2.5 text-xs transition-colors",
-                                      pathname === subItem.url ? "bg-primary/10 text-primary font-bold" : "hover:bg-accent focus:bg-accent font-medium text-muted-foreground"
+                                      pathname === subItem.url
+                                        ? "bg-primary/10 text-primary font-bold"
+                                        : "hover:bg-accent focus:bg-accent font-medium text-muted-foreground",
                                     )}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setOpenMobile(false);
                                     }}
                                   >
-                                    <subItem.icon className={cn(
-                                      "h-4 w-4",
-                                      pathname === subItem.url ? "text-primary" : "text-muted-foreground/50"
-                                    )} />
+                                    <subItem.icon
+                                      className={cn(
+                                        "h-4 w-4",
+                                        pathname === subItem.url
+                                          ? "text-primary"
+                                          : "text-muted-foreground/50",
+                                      )}
+                                    />
                                     <span>{subItem.title}</span>
                                   </Link>
                                 </DropdownMenuItem>
@@ -138,26 +155,32 @@ export function AppSidebar() {
                         </SidebarMenuItem>
                       ) : (
                         /* ACORDEÓN PARA SIDEBAR EXPANDIDO */
-                        <Collapsible 
-                          asChild 
+                        <Collapsible
+                          asChild
                           defaultOpen={isGroupActive}
                           className="group/collapsible"
                         >
                           <SidebarMenuItem>
                             <CollapsibleTrigger asChild>
-                              <SidebarMenuButton 
+                              <SidebarMenuButton
                                 tooltip={item.title}
                                 isActive={isGroupActive}
                                 className={cn(
                                   "h-10 rounded-lg transition-all duration-200",
-                                  isGroupActive && "bg-primary/5 text-primary"
+                                  isGroupActive && "bg-primary/5 text-primary",
                                 )}
                               >
-                                <item.icon className={cn(
-                                  "h-[18px] w-[18px]",
-                                  isGroupActive ? "text-primary" : "text-muted-foreground"
-                                )} />
-                                <span className="font-bold text-sm tracking-tight">{item.title}</span>
+                                <item.icon
+                                  className={cn(
+                                    "h-[18px] w-[18px]",
+                                    isGroupActive
+                                      ? "text-primary"
+                                      : "text-muted-foreground",
+                                  )}
+                                />
+                                <span className="font-bold text-sm tracking-tight">
+                                  {item.title}
+                                </span>
                                 <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/40 transition-transform duration-300 group-data-[state=open]/collapsible:rotate-90" />
                               </SidebarMenuButton>
                             </CollapsibleTrigger>
@@ -167,18 +190,23 @@ export function AppSidebar() {
                                   const isSubActive = pathname === subItem.url;
                                   return (
                                     <SidebarMenuSubItem key={subItem.title}>
-                                      <SidebarMenuSubButton asChild isActive={isSubActive}>
-                                        <Link 
-                                          href={subItem.url} 
+                                      <SidebarMenuSubButton
+                                        asChild
+                                        isActive={isSubActive}
+                                      >
+                                        <Link
+                                          href={subItem.url}
                                           className={cn(
                                             "flex items-center gap-3 h-9 rounded-md transition-all px-3",
-                                            isSubActive 
-                                              ? "bg-primary text-primary-foreground font-black shadow-sm" 
-                                              : "hover:bg-secondary/50 text-muted-foreground font-medium"
+                                            isSubActive
+                                              ? "bg-primary text-primary-foreground font-black shadow-sm"
+                                              : "hover:bg-secondary/50 text-muted-foreground font-medium",
                                           )}
                                         >
                                           <subItem.icon className="h-4 w-4" />
-                                          <span className="text-[13px] tracking-tight">{subItem.title}</span>
+                                          <span className="text-[13px] tracking-tight">
+                                            {subItem.title}
+                                          </span>
                                         </Link>
                                       </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -192,21 +220,31 @@ export function AppSidebar() {
                     ) : (
                       /* ÍTEM SIMPLE SIN SUBMENÚS */
                       <SidebarMenuItem>
-                        <SidebarMenuButton 
-                          asChild 
-                          tooltip={item.title} 
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={item.title}
                           isActive={isGroupActive}
                           className={cn(
                             "h-10 rounded-lg transition-all",
-                            isGroupActive && "bg-primary/5 text-primary font-black"
+                            isGroupActive &&
+                              "bg-primary/5 text-primary font-black",
                           )}
                         >
-                          <Link href={item.url} className="flex items-center gap-3 px-3">
-                            <item.icon className={cn(
-                              "h-[18px] w-[18px]",
-                              isGroupActive ? "text-primary" : "text-muted-foreground"
-                            )} />
-                            <span className="font-bold text-sm tracking-tight">{item.title}</span>
+                          <Link
+                            href={item.url}
+                            className="flex items-center gap-3 px-3"
+                          >
+                            <item.icon
+                              className={cn(
+                                "h-[18px] w-[18px]",
+                                isGroupActive
+                                  ? "text-primary"
+                                  : "text-muted-foreground",
+                              )}
+                            />
+                            <span className="font-bold text-sm tracking-tight">
+                              {item.title}
+                            </span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -218,8 +256,11 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      
+
       <SidebarRail />
+      <div className="absolute -right-3.5 top-5 z-50 hidden md:flex">
+        <SidebarTrigger className="h-7 w-7 rounded-full border border-border/60 bg-background shadow-sm hover:bg-secondary [&_svg]:h-4 [&_svg]:w-4 transition-transform" />
+      </div>
     </Sidebar>
   );
 }

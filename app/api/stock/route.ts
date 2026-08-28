@@ -13,7 +13,6 @@ export async function GET(req: NextRequest) {
 
     const joins = `
       LEFT JOIN grupos_articulos g ON pr.grupo_articulo_id = g.id
-      LEFT JOIN stock_cache sc ON pr.sku = sc.producto
       LEFT JOIN inventario i ON pr.sku = i.producto
       LEFT JOIN (
         SELECT producto,
@@ -41,14 +40,14 @@ export async function GET(req: NextRequest) {
     const stock = db.prepare(`
       SELECT 
         pr.sku as producto,
-        COALESCE(sc.lote, '') as lote,
+        COALESCE(i.lote, '') as lote,
         pr.glosa,
         pr.unidad_codigo as unidad,
-        (COALESCE(i.cantidad_fisica, sc.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock,
+        (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock,
         COALESCE(g.nombre, 'GENERAL') as familia,
         pr.peso_neto as peso,
-        sc.ultimo_ingreso,
-        sc.fecha_sync,
+        pr.created_at as ultimo_ingreso,
+        pr.updated_at as fecha_sync,
         i.id as inventario_id,
         i.cantidad_fisica,
         i.dif,
@@ -74,7 +73,7 @@ export async function GET(req: NextRequest) {
         (CASE WHEN (i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0) OR i.usuario_id IS NOT NULL OR (i.comentario IS NOT NULL AND i.comentario != '') THEN 1 ELSE 0 END) as ya_contado,
         COALESCE(m.total_ingresos, 0) as total_ingresos,
         COALESCE(m.total_salidas, 0) as total_salidas,
-        (COALESCE(i.cantidad_fisica, sc.stock, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_disponible
+        (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_disponible
       FROM productos pr
       ${joins}
       ${whereClause}

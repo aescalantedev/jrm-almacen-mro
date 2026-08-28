@@ -39,15 +39,7 @@ export async function GET(req: NextRequest) {
         pr.grado_acero,
         pr.espesor_acero,
         COUNT(DISTINCT i.id) as inventario_count,
-        COALESCE(
-          (
-            SELECT SUM(COALESCE(inv.cantidad_fisica, sc.stock, 0))
-            FROM stock_cache sc
-            LEFT JOIN inventario inv ON sc.producto = inv.producto AND IFNULL(sc.lote, '') = IFNULL(inv.lote, '')
-            WHERE sc.producto = pr.sku
-          ),
-          0
-        ) + COALESCE(
+        COALESCE(SUM(i.cantidad_fisica), 0) + COALESCE(
           (SELECT SUM(CASE WHEN m.tipo = 'INGRESO' THEN m.cantidad ELSE -m.cantidad END) FROM movimientos m WHERE m.producto = pr.sku),
           0
         ) as stock_total
@@ -320,8 +312,8 @@ export async function DELETE(req: NextRequest) {
     
     // Eliminar de productos y tablas relacionadas
     const deleteTx = db.transaction(() => {
+      db.prepare(`UPDATE productos SET is_deleted = 1, deleted_at = datetime('now', '-5 hours') WHERE sku IN (${placeholders})`).run(...skusToDelete);
       db.prepare(`DELETE FROM producto_costos_historial WHERE producto_sku IN (${placeholders})`).run(...skusToDelete);
-      db.prepare(`DELETE FROM stock_cache WHERE producto IN (${placeholders})`).run(...skusToDelete);
       const res = db.prepare(`DELETE FROM productos WHERE sku IN (${placeholders})`).run(...skusToDelete);
       return res.changes;
     });

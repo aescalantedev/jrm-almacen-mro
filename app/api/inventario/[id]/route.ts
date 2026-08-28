@@ -17,10 +17,9 @@ export async function PUT(
     const id = bodyId || resolvedParams?.id;
     if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
     const existing = db.prepare(`
-      SELECT i.*, p.costo_unitario, p.peso as peso_aprox_unitario, s.stock as stock_sistema
+      SELECT i.*, p.costo_unitario_actual as costo_unitario, p.peso_neto as peso_aprox_unitario
       FROM inventario i
-      JOIN productos_master p ON i.producto = p.producto
-      LEFT JOIN stock_cache s ON i.producto = s.producto AND i.lote = s.lote
+      JOIN productos p ON i.producto = p.sku
       WHERE i.id = ?
     `).get(id) as Record<string, unknown> | undefined;
     if (!existing) return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 });

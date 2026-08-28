@@ -22,7 +22,7 @@ const themes = [
   },
   { 
     name: "Titanium Slate", 
-    value: "", 
+    value: "slate", 
     color: "bg-neutral-800 dark:bg-neutral-200",
     desc: "Minimalista neutro"
   },

@@ -1,0 +1,1006 @@
+{
+    "total": 91,
+    "items": [
+        {
+            "codigo": "801.12.029",
+            "cantidad": 3,
+            "peso_kg": 0.1126,
+            "medidas": {
+                "largo": 0.93,
+                "alto": 0.45,
+                "espesor": 0.15
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "25.33.01.060",
+            "cantidad": 1,
+            "peso_kg": 0.029,
+            "medidas": {
+                "largo": 0.68,
+                "alto": 0.14,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "25.33.01.080",
+            "cantidad": 1,
+            "peso_kg": 0.029,
+            "medidas": {
+                "largo": 0.68,
+                "alto": 0.14,
+                "espesor": 0.14
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "606.05.16",
+            "cantidad": 2,
+            "peso_kg": 4.139,
+            "medidas": {
+                "largo": 31.05,
+                "alto": 20.0,
+                "espesor": 0.8
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "801.14.002",
+            "cantidad": 8,
+            "peso_kg": null,
+            "medidas": {
+                "largo": 20.636,
+                "alto": null,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "801.15.1694",
+            "cantidad": 9,
+            "peso_kg": 0.28,
+            "medidas": {
+                "largo": 15.03,
+                "alto": 15.03,
+                "espesor": 0.62
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "601.01.1159",
+            "cantidad": 3,
+            "peso_kg": 0.825,
+            "medidas": {
+                "largo": 15.03,
+                "alto": 12.0,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "602.02.616",
+            "cantidad": 1,
+            "peso_kg": 0.224,
+            "medidas": {
+                "largo": 0.85,
+                "alto": 17.0,
+                "espesor": 0.57
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "20.90.68.003",
+            "cantidad": 1,
+            "peso_kg": 0.479,
+            "medidas": {
+                "largo": 12.03,
+                "alto": 10.05,
+                "espesor": 0.83
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "604.06.034",
+            "cantidad": 1,
+            "peso_kg": 0.087,
+            "medidas": {
+                "largo": 11.05,
+                "alto": 0.43,
+                "espesor": 0.43
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "13.44.12.1225",
+            "cantidad": 2,
+            "peso_kg": 0.056,
+            "medidas": {
+                "largo": 17.0,
+                "alto": 0.2,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "20.90.73.001",
+            "cantidad": 1,
+            "peso_kg": 0.241,
+            "medidas": {
+                "largo": 15.03,
+                "alto": 0.83,
+                "espesor": 0.4
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "409.12.1290",
+            "cantidad": 2,
+            "peso_kg": 0.04,
+            "medidas": {
+                "largo": 15.0,
+                "alto": 10.0,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "604.04.387",
+            "cantidad": 6,
+            "peso_kg": 0.054,
+            "medidas": {
+                "largo": 0.9,
+                "alto": 0.75,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "801.15.4693",
+            "cantidad": 1,
+            "peso_kg": 0.278,
+            "medidas": {
+                "largo": 15.05,
+                "alto": 15.05,
+                "espesor": 0.65
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "604.05.60",
+            "cantidad": 8,
+            "peso_kg": 0.043,
+            "medidas": {
+                "largo": 0.65,
+                "alto": 0.35,
+                "espesor": 0.35
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "20.90.47.001",
+            "cantidad": 1,
+            "peso_kg": 0.224,
+            "medidas": {
+                "largo": 18.05,
+                "alto": 0.74,
+                "espesor": null
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "15.67.01.052",
+            "cantidad": 1,
+            "peso_kg": 0.061,
+            "medidas": {
+                "largo": 0.9,
+                "alto": 0.25,
+                "espesor": 0.5
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "409.99.115",
+            "cantidad": 2,
+            "peso_kg": 0.19,
+            "medidas": {
+                "largo": 16.0,
+                "alto": 0.45,
+                "espesor": 0.87
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "605.03.622",
+            "cantidad": 5,
+            "peso_kg": 0.1123,
+            "medidas": {
+                "largo": 0.9,
+                "alto": 0.052,
+                "espesor": 0.145
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "801.15.1532",
+            "cantidad": 2,
+            "peso_kg": 0.021,
+            "medidas": {
+                "largo": 18.0,
+                "alto": 0.25,
+                "espesor": 10.0
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "20.90.55.001",
+            "cantidad": 21,
+            "peso_kg": 1.408,
+            "medidas": {
+                "largo": 15.0,
+                "alto": 11.0,
+                "espesor": 15.0
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "801.5.137",
+            "cantidad": 3,
+            "peso_kg": 0.113,
+            "medidas": {
+                "largo": 18.0,
+                "alto": 0.25,
+                "espesor": 15.0
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "13.24.06.002",
+            "cantidad": 10,
+            "peso_kg": 0.077,
+            "medidas": {
+                "largo": 0.8,
+                "alto": 0.11,
+                "espesor": 0.55
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "13.24.06.004",
+            "cantidad": 10,
+            "peso_kg": 0.079,
+            "medidas": {
+                "largo": 0.8,
+                "alto": 0.11,
+                "espesor": 0.55
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "606.07.019",
+            "cantidad": 7,
+            "peso_kg": 0.01,
+            "medidas": {
+                "largo": 0.75,
+                "alto": 0.75,
+                "espesor": 0.1
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "801.15.1623",
+            "cantidad": 1,
+            "peso_kg": 0.025,
+            "medidas": {
+                "largo": 0.93,
+                "alto": 10.0,
+                "espesor": 0.05
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "13.05.02.101",
+            "cantidad": 6,
+            "peso_kg": 0.037,
+            "medidas": {
+                "largo": 0.8,
+                "alto": 0.3,
+                "espesor": 0.5
+            },
+            "fecha": "14/08/26"
+        },
+        {
+            "codigo": "13.05.02.100",
+            "cantidad": 8,
+            "peso_kg": 0.037,
+            "medidas": {
+                "largo": 0.8,
+                "alto": 0.45,
+                "espesor": 0.2
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "608.01.311",
+            "cantidad": 5,
+            "peso_kg": 0.1169,
+            "medidas": {
+                "largo": 11.05,
+                "alto": 11.03,
+                "espesor": 0.2
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.60.001",
+            "cantidad": 3,
+            "peso_kg": 1.27,
+            "medidas": {
+                "largo": 15.0,
+                "alto": 0.95,
+                "espesor": 10.0
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.52.005",
+            "cantidad": 1,
+            "peso_kg": 1.613,
+            "medidas": {
+                "largo": 10.0,
+                "alto": 10.0,
+                "espesor": 0.48
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.54.006",
+            "cantidad": 1,
+            "peso_kg": 6.275,
+            "medidas": {
+                "largo": 35.0,
+                "alto": 0.8,
+                "espesor": 0.7
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.56.001",
+            "cantidad": 4,
+            "peso_kg": 2.938,
+            "medidas": {
+                "largo": 37.08,
+                "alto": 20.0,
+                "espesor": 0.24
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.52.008",
+            "cantidad": 4,
+            "peso_kg": 0.145,
+            "medidas": {
+                "largo": 13.0,
+                "alto": 0.8,
+                "espesor": 0.15
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "601.01.1159",
+            "cantidad": 5,
+            "peso_kg": 0.296,
+            "medidas": {
+                "largo": 28.0,
+                "alto": 21.05,
+                "espesor": 10.0
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "15.67.01.045",
+            "cantidad": 4,
+            "peso_kg": 0.268,
+            "medidas": {
+                "largo": 0.4,
+                "alto": 0.9,
+                "espesor": 0.9
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "605.03.622",
+            "cantidad": 4,
+            "peso_kg": 8.122,
+            "medidas": {
+                "largo": 0.86,
+                "alto": 0.53,
+                "espesor": null
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "15.67.01.048",
+            "cantidad": 2,
+            "peso_kg": 0.11,
+            "medidas": {
+                "largo": 0.34,
+                "alto": 0.89,
+                "espesor": 0.55
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "607.07.100",
+            "cantidad": 3,
+            "peso_kg": 0.114,
+            "medidas": {
+                "largo": 19.05,
+                "alto": 11.05,
+                "espesor": 0.4
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "801.15.3224",
+            "cantidad": 2,
+            "peso_kg": 0.39,
+            "medidas": {
+                "largo": 0.33,
+                "alto": 0.35,
+                "espesor": 0.43
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.44.001",
+            "cantidad": 16,
+            "peso_kg": 0.096,
+            "medidas": {
+                "largo": 2.2,
+                "alto": 11.05,
+                "espesor": 0.63
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "20.90.24.101",
+            "cantidad": 4,
+            "peso_kg": 0.04,
+            "medidas": {
+                "largo": 23.0,
+                "alto": 14.05,
+                "espesor": 0.15
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "801.15.1486",
+            "cantidad": 2,
+            "peso_kg": 0.213,
+            "medidas": {
+                "largo": 0.6,
+                "alto": 0.2,
+                "espesor": 0.6
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "801.15.1695",
+            "cantidad": 8,
+            "peso_kg": 0.007,
+            "medidas": {
+                "largo": 0.53,
+                "alto": 0.5,
+                "espesor": 0.1
+            },
+            "fecha": "15/08/26"
+        },
+        {
+            "codigo": "15.67.04.018",
+            "cantidad": 194,
+            "peso_kg": 0.463,
+            "medidas": {
+                "largo": 19.0,
+                "alto": 11.0,
+                "espesor": 0.4
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "15.67.04.020",
+            "cantidad": 6,
+            "peso_kg": 0.018,
+            "medidas": {
+                "largo": 20.0,
+                "alto": 28.05,
+                "espesor": 0.15
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "15.67.04.019",
+            "cantidad": 86,
+            "peso_kg": 1.021,
+            "medidas": {
+                "largo": 24.0,
+                "alto": 25.0,
+                "espesor": 0.2
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "15.67.04.014",
+            "cantidad": 5,
+            "peso_kg": 0.09,
+            "medidas": {
+                "largo": 0.07,
+                "alto": 11.05,
+                "espesor": 0.8
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "20.90.08.001",
+            "cantidad": 3,
+            "peso_kg": 0.042,
+            "medidas": {
+                "largo": 0.5,
+                "alto": 0.55,
+                "espesor": 16.0
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "13.44.09.001",
+            "cantidad": 3,
+            "peso_kg": 0.039,
+            "medidas": {
+                "largo": 0.08,
+                "alto": 17.0,
+                "espesor": 26.05
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "18.36.02.002",
+            "cantidad": 1,
+            "peso_kg": 4.4,
+            "medidas": {
+                "largo": 0.62,
+                "alto": 20.03,
+                "espesor": 12.0
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "18.48.01.004",
+            "cantidad": 2,
+            "peso_kg": 0.146,
+            "medidas": {
+                "largo": 41.05,
+                "alto": 32.07,
+                "espesor": 31.0
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.15.2166",
+            "cantidad": 5,
+            "peso_kg": 0.286,
+            "medidas": {
+                "largo": 0.7,
+                "alto": 0.95,
+                "espesor": 0.7
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.15.2168",
+            "cantidad": 1,
+            "peso_kg": 0.483,
+            "medidas": {
+                "largo": 13.0,
+                "alto": 0.75,
+                "espesor": 0.75
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.15.2169",
+            "cantidad": 4,
+            "peso_kg": 0.325,
+            "medidas": {
+                "largo": 0.8,
+                "alto": 0.8,
+                "espesor": 11.0
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.15.2167",
+            "cantidad": 1,
+            "peso_kg": 0.354,
+            "medidas": {
+                "largo": 12.0,
+                "alto": 0.48,
+                "espesor": 19.07
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.15.2171",
+            "cantidad": 1,
+            "peso_kg": 0.203,
+            "medidas": {
+                "largo": 0.85,
+                "alto": 10.05,
+                "espesor": 0.53
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "19.04.02.015",
+            "cantidad": 2,
+            "peso_kg": 1.559,
+            "medidas": {
+                "largo": 20.0,
+                "alto": 14.05,
+                "espesor": 14.05
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "605.03.402.24",
+            "cantidad": 1,
+            "peso_kg": 0.532,
+            "medidas": {
+                "largo": 28.0,
+                "alto": 0.78,
+                "espesor": 0.78
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "20.90.52.012",
+            "cantidad": 3,
+            "peso_kg": 0.006,
+            "medidas": {
+                "largo": 14.05,
+                "alto": 10.02,
+                "espesor": 0.05
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "409.12.1079",
+            "cantidad": 20,
+            "peso_kg": 0.018,
+            "medidas": {
+                "largo": 28.0,
+                "alto": 22.06,
+                "espesor": 0.001
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.01.261",
+            "cantidad": 6,
+            "peso_kg": 0.431,
+            "medidas": {
+                "largo": 22.04,
+                "alto": 0.6,
+                "espesor": 0.65
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "18.48.01.003",
+            "cantidad": 1,
+            "peso_kg": 14.822,
+            "medidas": {
+                "largo": 33.0,
+                "alto": 31.0,
+                "espesor": 12.0
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "801.15.1251",
+            "cantidad": 2,
+            "peso_kg": 5.989,
+            "medidas": {
+                "largo": 16.07,
+                "alto": 18.0,
+                "espesor": 0.71
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "409.18.771",
+            "cantidad": 6,
+            "peso_kg": 0.423,
+            "medidas": {
+                "largo": 24.0,
+                "alto": null,
+                "espesor": null
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "20.82.02.114.102",
+            "cantidad": 2,
+            "peso_kg": 24.422,
+            "medidas": {
+                "largo": 33.0,
+                "alto": 33.0,
+                "espesor": 1.95
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "801.15.2165",
+            "cantidad": 1,
+            "peso_kg": 6.733,
+            "medidas": {
+                "largo": 50.0,
+                "alto": 35.0,
+                "espesor": 25.0
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "801.15.3868",
+            "cantidad": 3,
+            "peso_kg": 8.696,
+            "medidas": {
+                "largo": 34.05,
+                "alto": 22.05,
+                "espesor": 12.0
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "801.15.4017",
+            "cantidad": 2,
+            "peso_kg": 0.426,
+            "medidas": {
+                "largo": 20.0,
+                "alto": 0.4,
+                "espesor": null
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "801.15.4014",
+            "cantidad": 1,
+            "peso_kg": 1.198,
+            "medidas": {
+                "largo": 47.0,
+                "alto": 17.0,
+                "espesor": 11.0
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "801.15.4016",
+            "cantidad": 1,
+            "peso_kg": 1.049,
+            "medidas": {
+                "largo": 39.0,
+                "alto": 13.05,
+                "espesor": 13.05
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "15.80.16.340038",
+            "cantidad": 1,
+            "peso_kg": 0.4,
+            "medidas": {
+                "largo": 25.05,
+                "alto": 26.0,
+                "espesor": null
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "801.15.4027",
+            "cantidad": 1,
+            "peso_kg": 0.206,
+            "medidas": {
+                "largo": 43.0,
+                "alto": 24.0,
+                "espesor": 0.05
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "18.33.004.12",
+            "cantidad": 1,
+            "peso_kg": 2.141,
+            "medidas": {
+                "largo": 35.0,
+                "alto": 40.0,
+                "espesor": 10.05
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "603.01.1300",
+            "cantidad": 4,
+            "peso_kg": 8.292,
+            "medidas": {
+                "largo": 50.0,
+                "alto": 50.0,
+                "espesor": 24.0
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "604.04.212",
+            "cantidad": 10,
+            "peso_kg": 0.145,
+            "medidas": {
+                "largo": 14.0,
+                "alto": 0.4,
+                "espesor": 0.4
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "13.31.01.050.220.002",
+            "cantidad": 1,
+            "peso_kg": 2.658,
+            "medidas": {
+                "largo": 19.0,
+                "alto": 24.05,
+                "espesor": 27.0
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "20.83.01.114.101",
+            "cantidad": 30,
+            "peso_kg": 0.117,
+            "medidas": {
+                "largo": 14.05,
+                "alto": 21.0,
+                "espesor": null
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "28.06.07.223",
+            "cantidad": 4,
+            "peso_kg": 1.412,
+            "medidas": {
+                "largo": 17.0,
+                "alto": 25.0,
+                "espesor": 0.9
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "20.32.09.001",
+            "cantidad": 1,
+            "peso_kg": 1.47,
+            "medidas": {
+                "largo": 46.05,
+                "alto": 30.0,
+                "espesor": 7.0
+            },
+            "fecha": "19/08/26"
+        },
+        {
+            "codigo": "27.1.05.002",
+            "cantidad": 2,
+            "peso_kg": 4.5,
+            "medidas": {
+                "largo": 23.0,
+                "alto": 28.0,
+                "espesor": 10.0
+            },
+            "fecha": "19/08/26"
+        },
+        {
+            "codigo": "801.15.1985",
+            "cantidad": 2,
+            "peso_kg": 3.408,
+            "medidas": {
+                "largo": 31.0,
+                "alto": 31.0,
+                "espesor": 51.0
+            },
+            "fecha": "19/08/26"
+        },
+        {
+            "codigo": "801.15.1000.3",
+            "cantidad": 1,
+            "peso_kg": 72.578,
+            "medidas": {
+                "largo": 49.0,
+                "alto": 49.0,
+                "espesor": 44.0
+            },
+            "fecha": "19/08/26"
+        },
+        {
+            "codigo": "13.98.01.015",
+            "cantidad": 4,
+            "peso_kg": 15.76,
+            "medidas": {
+                "largo": 36.0,
+                "alto": 47.0,
+                "espesor": 39.0
+            },
+            "fecha": "19/08/26"
+        },
+        {
+            "codigo": "13.98.01.016",
+            "cantidad": 1,
+            "peso_kg": 1.806,
+            "medidas": {
+                "largo": 18.0,
+                "alto": 28.0,
+                "espesor": 13.0
+            },
+            "fecha": "19/08/26"
+        },
+        {
+            "codigo": "RPTS01S01000071",
+            "cantidad": 18,
+            "peso_kg": 0.155,
+            "medidas": {
+                "largo": 0.6,
+                "alto": 0.35,
+                "espesor": 0.35
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "RPTS01S01000070",
+            "cantidad": 18,
+            "peso_kg": 0.24,
+            "medidas": {
+                "largo": 0.54,
+                "alto": 0.45,
+                "espesor": 0.45
+            },
+            "fecha": "18/08/26"
+        },
+        {
+            "codigo": "RPTS01S10000530",
+            "cantidad": 2,
+            "peso_kg": 0.388,
+            "medidas": {
+                "largo": 22.07,
+                "alto": 0.7,
+                "espesor": 0.7
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "RPTS01S10000532",
+            "cantidad": 6,
+            "peso_kg": 1.525,
+            "medidas": {
+                "largo": 29.05,
+                "alto": 16.0,
+                "espesor": 0.92
+            },
+            "fecha": "17/08/26"
+        },
+        {
+            "codigo": "RPTS01S10000072",
+            "cantidad": 3,
+            "peso_kg": 1.409,
+            "medidas": {
+                "largo": 29.0,
+                "alto": 3.05,
+                "espesor": 0.8
+            },
+            "fecha": "17/08/26"
+        }
+    ]
+}

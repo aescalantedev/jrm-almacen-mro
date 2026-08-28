@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
+import { getDB, getStockTeorico } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
   try {
@@ -187,31 +187,8 @@ export async function POST(req: NextRequest) {
           throw new Error(`El producto ${item.producto} no existe en el catálogo maestro`);
         }
 
-        // 1. Calculate base initial stock
-        const invRow = db.prepare(`
-          SELECT cantidad_fisica 
-          FROM inventario 
-          WHERE producto = ? AND IFNULL(lote, '') = ?
-        `).get(item.producto, item.lote || '') as { cantidad_fisica: number } | undefined;
-
-        const cacheRow = db.prepare(`
-          SELECT stock 
-          FROM stock_cache 
-          WHERE producto = ? AND IFNULL(lote, '') = ?
-        `).get(item.producto, item.lote || '') as { stock: number } | undefined;
-
-        const baseStock = invRow?.cantidad_fisica ?? cacheRow?.stock ?? 0;
-
-        // 2. Sum existing movements
-        const movRow = db.prepare(`
-          SELECT 
-            COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END), 0) as ingresos,
-            COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END), 0) as salidas
-          FROM movimientos
-          WHERE producto = ? AND IFNULL(lote, '') = ?
-        `).get(item.producto, item.lote || '') as { ingresos: number; salidas: number };
-
-        const stockAnterior = baseStock + movRow.ingresos - movRow.salidas;
+        // Calculate current stock
+        const stockAnterior = getStockTeorico(db, item.producto, item.lote || '');
 
         // 3. Validation for SALIDA
         if (tipo === 'SALIDA' && !permitir_negativo && item.cantidad > stockAnterior) {

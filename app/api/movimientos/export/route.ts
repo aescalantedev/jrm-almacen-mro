@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         m.tipo,
         m.producto,
         p.glosa as descripcion,
-        p.unidad,
+        p.unidad_codigo as unidad,
         m.lote,
         m.cantidad,
         m.stock_anterior,
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         u.nombre as usuario_nombre,
         m.comentario
       FROM movimientos m
-      JOIN productos_master p ON m.producto = p.producto
+      JOIN productos p ON m.producto = p.sku
       LEFT JOIN usuarios u ON m.usuario_id = u.id
       ${whereClause}
       ORDER BY m.created_at DESC, m.id DESC

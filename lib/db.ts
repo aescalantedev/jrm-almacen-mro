@@ -200,37 +200,11 @@ function initSchema(db: Database.Database) {
     );
 
     -- ─────────────────────────────────────────────────────────────
-    -- TABLAS LEGACY MANTENIDAS PARA COMPATIBILIDAD TRANSITORIA
+    -- CLEANUP: ELIMINAR TABLAS LEGACY
     -- ─────────────────────────────────────────────────────────────
-    CREATE TABLE IF NOT EXISTS productos_master (
-      producto TEXT PRIMARY KEY,
-      glosa TEXT DEFAULT '',
-      unidad TEXT DEFAULT '',
-      familia TEXT DEFAULT '',
-      subfamilia TEXT DEFAULT '',
-      tipo TEXT DEFAULT '',
-      peso REAL DEFAULT 0,
-      costo_unitario REAL DEFAULT 0,
-      tipo_acero TEXT DEFAULT '',
-      grado_acero TEXT DEFAULT '',
-      espesor_acero TEXT DEFAULT '',
-      peso_producto REAL DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now', '-5 hours')),
-      updated_at TEXT DEFAULT (datetime('now', '-5 hours'))
-    );
-
-    CREATE TABLE IF NOT EXISTS stock_cache (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      empresa TEXT DEFAULT '',
-      bodega TEXT DEFAULT '',
-      ubicacion TEXT DEFAULT '',
-      lote TEXT DEFAULT '',
-      producto TEXT NOT NULL,
-      stock REAL DEFAULT 0,
-      ultimo_ingreso TEXT,
-      fecha_sync TEXT DEFAULT (datetime('now', '-5 hours')),
-      UNIQUE(lote, producto)
-    );
+    DROP TABLE IF EXISTS productos_master;
+    DROP TABLE IF EXISTS stock_cache;
+    DROP TABLE IF EXISTS sync_log;
 
     CREATE TABLE IF NOT EXISTS inventario (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -275,15 +249,6 @@ function initSchema(db: Database.Database) {
       FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
     );
 
-    CREATE TABLE IF NOT EXISTS sync_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      tipo TEXT,
-      registros_sync INTEGER DEFAULT 0,
-      fecha TEXT DEFAULT (datetime('now', '-5 hours')),
-      estado TEXT DEFAULT 'ok',
-      detalle TEXT
-    );
-
     CREATE TABLE IF NOT EXISTS movimientos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tipo TEXT NOT NULL CHECK(tipo IN ('INGRESO', 'SALIDA', 'AJUSTE')),
@@ -322,8 +287,6 @@ function ensureIndexes(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_costos_hist_fechas ON producto_costos_historial(fecha_validez_desde, fecha_validez_hasta);
 
     -- Índices existentes
-    CREATE INDEX IF NOT EXISTS idx_stock_producto ON stock_cache(producto);
-    CREATE INDEX IF NOT EXISTS idx_stock_lote ON stock_cache(lote);
     CREATE INDEX IF NOT EXISTS idx_inventario_producto ON inventario(producto);
     CREATE INDEX IF NOT EXISTS idx_inventario_usuario ON inventario(usuario_id);
     CREATE INDEX IF NOT EXISTS idx_inventario_lote ON inventario(lote);
@@ -334,36 +297,34 @@ function ensureIndexes(db: Database.Database) {
 }
 
 /**
- * Calcula el Stock Teórico Real y Dinámico de un repuesto consolidando conteo base y movimientos del Kárdex
+ * Calcula el Stock Teórico Real de un repuesto consolidando conteo físico (inventario) y movimientos (Kárdex)
  */
 export function getStockTeorico(db: Database.Database, sku: string, lote = ''): number {
   const cleanSKU = sku.trim().toUpperCase();
   const cleanLote = (lote || '').trim();
 
-  // 1. Stock base: último conteo físico o stock de cache
+  // 1. Obtener la fecha y cantidad del último conteo físico
   const invRow = db.prepare(`
-    SELECT cantidad_fisica 
+    SELECT cantidad_fisica, created_at 
     FROM inventario 
     WHERE producto = ? AND IFNULL(lote, '') = ?
-  `).get(cleanSKU, cleanLote) as { cantidad_fisica: number } | undefined;
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(cleanSKU, cleanLote) as { cantidad_fisica: number, created_at: string } | undefined;
 
-  const cacheRow = db.prepare(`
-    SELECT stock 
-    FROM stock_cache 
-    WHERE producto = ? AND IFNULL(lote, '') = ?
-  `).get(cleanSKU, cleanLote) as { stock: number } | undefined;
+  const baseStock = invRow?.cantidad_fisica ?? 0;
+  const baseDate = invRow?.created_at ?? '1970-01-01 00:00:00';
 
-  const baseStock = invRow?.cantidad_fisica ?? cacheRow?.stock ?? 0;
-
-  // 2. Sumatoria de movimientos transaccionales posteriores
+  // 2. Sumar solo los movimientos que ocurrieron DESPUÉS del último conteo físico
   const movRow = db.prepare(`
     SELECT 
       COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END), 0) as ingresos,
-      COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END), 0) as salidas
+      COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END), 0) as salidas,
+      COALESCE(SUM(CASE WHEN tipo = 'AJUSTE' THEN cantidad ELSE 0 END), 0) as ajustes
     FROM movimientos
-    WHERE producto = ? AND IFNULL(lote, '') = ?
-  `).get(cleanSKU, cleanLote) as { ingresos: number; salidas: number };
+    WHERE producto = ? AND IFNULL(lote, '') = ? AND created_at > ?
+  `).get(cleanSKU, cleanLote, baseDate) as { ingresos: number; salidas: number; ajustes: number };
 
-  return baseStock + movRow.ingresos - movRow.salidas;
+  return baseStock + movRow.ingresos + movRow.ajustes - movRow.salidas;
 }
 

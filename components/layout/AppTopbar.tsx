@@ -125,8 +125,8 @@ export function AppTopbar() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
-        <SidebarTrigger className="hover:bg-secondary/80 rounded-lg shrink-0" />
-        <div className="h-6 w-[1px] bg-border/50 hidden sm:block shrink-0" />
+        <SidebarTrigger className="hover:bg-secondary/80 rounded-lg shrink-0 md:hidden" />
+        <div className="h-6 w-[1px] bg-border/50 hidden sm:block md:hidden shrink-0" />
 
         {/* TÍTULO DINÁMICO DE LA PÁGINA EN EL NAVBAR */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -179,7 +179,10 @@ export function AppTopbar() {
                 className="relative h-9 w-9 rounded-full p-0 overflow-hidden ring-offset-background transition-all hover:ring-2 hover:ring-primary/20 cursor-pointer"
               >
                 <Avatar className="h-9 w-9 border border-border/60">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold" suppressHydrationWarning>
+                  <AvatarFallback
+                    className="bg-primary/10 text-primary text-xs font-bold"
+                    suppressHydrationWarning
+                  >
                     {user?.nombre
                       ?.split(" ")
                       .map((n: string) => n[0])
@@ -190,13 +193,22 @@ export function AppTopbar() {
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 mt-2 rounded-2xl shadow-xl border-border/60 p-1.5 z-50" align="end">
+            <DropdownMenuContent
+              className="w-56 mt-2 rounded-2xl shadow-xl border-border/60 p-1.5 z-50"
+              align="end"
+            >
               <DropdownMenuLabel className="font-normal p-2">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-bold leading-none text-foreground" suppressHydrationWarning>
+                  <p
+                    className="text-sm font-bold leading-none text-foreground"
+                    suppressHydrationWarning
+                  >
                     {user?.nombre || "Usuario"}
                   </p>
-                  <p className="text-xs leading-none text-muted-foreground capitalize" suppressHydrationWarning>
+                  <p
+                    className="text-xs leading-none text-muted-foreground capitalize"
+                    suppressHydrationWarning
+                  >
                     {user?.rol || "almacenero"} — ALM MRO CHILCA
                   </p>
                 </div>

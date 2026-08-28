@@ -34,12 +34,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const cookieStore = await cookies();
-  const colorTheme = cookieStore.get("strix-color-theme")?.value || "";
+  const colorTheme = cookieStore.get("strix-color-theme")?.value || "sap";
 
   return (
-    <html lang="es" data-color-theme={colorTheme || undefined} suppressHydrationWarning>
-      <body className={`${fontSans.variable} font-sans antialiased selection:bg-primary/10 selection:text-primary min-h-screen bg-background`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <html lang="es" data-color-theme={colorTheme} suppressHydrationWarning>
+      <body suppressHydrationWarning className={`${fontSans.variable} font-sans antialiased selection:bg-primary/10 selection:text-primary min-h-screen bg-background`}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <AppShell>{children}</AppShell>
         </ThemeProvider>
       </body>

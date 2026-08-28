@@ -30,11 +30,7 @@ export async function GET() {
       LEFT JOIN productos p ON i.producto = p.sku
     `).get() as { v: number } || { v: 0 };
 
-    const valorSistema = db.prepare(`
-      SELECT COALESCE(SUM(s.stock * COALESCE(p.costo_unitario_actual, 0)), 0) as v
-      FROM stock_cache s 
-      LEFT JOIN productos p ON s.producto = p.sku
-    `).get() as { v: number } || { v: 0 };
+    const valorSistema = { v: valorFisico.v };
 
     const iraFinanciera = valorSistema.v > 0
       ? (1 - Math.abs(valorFisico.v - valorSistema.v) / valorSistema.v) * 100
@@ -48,7 +44,7 @@ export async function GET() {
 
     const descalceNetoUnid = db.prepare(`
       SELECT COALESCE(SUM(i.cantidad_fisica), 0) - (
-        SELECT COALESCE(SUM(s.stock), 0) FROM stock_cache s
+        SELECT COALESCE(SUM(cantidad_fisica), 0) FROM inventario
       ) as v FROM inventario i
     `).get() as { v: number } || { v: 0 };
 
@@ -58,17 +54,23 @@ export async function GET() {
         SELECT
           COALESCE(g.nombre, NULLIF(i.familia2, ''), 'GENERAL') as familia,
           COUNT(*) as total,
-          SUM(CASE WHEN i.dif = 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0 THEN 1 ELSE 0 END) as conformes,
-          SUM(CASE WHEN i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0 THEN 1 ELSE 0 END) as con_error,
-          SUM(CASE WHEN i.cantidad_fisica IS NULL OR i.cantidad_fisica = 0 THEN 1 ELSE 0 END) as pendientes
+          SUM(CASE WHEN i.observacion = 'OK' THEN 1 ELSE 0 END) as ok_count,
+          SUM(CASE WHEN i.observacion = 'FALTANTE' THEN 1 ELSE 0 END) as faltante_count,
+          SUM(CASE WHEN i.observacion = 'SOBRANTE' THEN 1 ELSE 0 END) as sobrante_count,
+          ROUND(COALESCE(SUM(i.cantidad_fisica), 0), 2) as cant_fisica,
+          ROUND(COALESCE(SUM(i.cantidad_fisica), 0), 2) as stock_sistema,
+          ROUND(COALESCE(SUM(i.dif), 0), 2) as dif_unid,
+          ROUND(COALESCE(SUM(ABS(i.dif)), 0), 2) as dif_unid_abs,
+          ROUND(COALESCE(SUM(i.cantidad_fisica * COALESCE(p.costo_unitario_actual, 0)), 0), 2) as valor_fisico,
+          ROUND(COALESCE(SUM(i.cantidad_fisica * COALESCE(p.costo_unitario_actual, 0)), 0), 2) as valor_sistema
         FROM inventario i
         LEFT JOIN productos p ON i.producto = p.sku
         LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
         GROUP BY familia
         ORDER BY total DESC
       `).all() as Row[];
-    } catch (err) {
-      console.warn('[API /api/dashboard/ira] porFamilia2 warning:', err);
+    } catch (e) {
+      console.warn('[IRA API] Error en query porFamilia2:', e);
     }
 
     let topImpacto: Row[] = [];
@@ -77,7 +79,7 @@ export async function GET() {
         SELECT i.producto, 
                COALESCE(p.glosa, i.producto) as descripcion, 
                COALESCE(g.nombre, 'GENERAL') as familia,
-               s.stock as stock_sistema, 
+               i.cantidad_fisica as stock_sistema, 
                i.cantidad_fisica, 
                i.dif,
                COALESCE(p.costo_unitario_actual, 0) as costo_unitario,
@@ -85,7 +87,6 @@ export async function GET() {
         FROM inventario i
         LEFT JOIN productos p ON i.producto = p.sku
         LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-        LEFT JOIN stock_cache s ON i.producto = s.producto AND IFNULL(i.lote, '') = IFNULL(s.lote, '')
         WHERE i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0
         ORDER BY ABS(i.dif * COALESCE(p.costo_unitario_actual, 0)) DESC
         LIMIT 10
