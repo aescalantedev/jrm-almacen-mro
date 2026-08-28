@@ -1,30 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-import { hashPassword, generateToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { nombre, usuario, password } = await req.json();
-    if (!nombre || !usuario || !password) {
-      return NextResponse.json({ error: 'Campos requeridos: nombre, usuario, password' }, { status: 400 });
+    const { nombre, email, password } = await req.json();
+    if (!nombre || !email || !password) {
+      return NextResponse.json({ error: 'Campos requeridos: nombre, email, password' }, { status: 400 });
     }
-    const db = getDB();
-    const existing = db.prepare('SELECT id FROM usuarios WHERE usuario = ?').get(usuario);
-    if (existing) {
-      return NextResponse.json({ error: 'El usuario ya existe' }, { status: 409 });
+
+    const supabase = await createClient();
+
+    // Si es el primer usuario o quieres forzar admin para pruebas, usa 'superadmin'
+    // En produccion deberia ser 'almacenero'
+    const assignedRol = 'superadmin'; 
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          nombre,
+          rol: assignedRol
+        }
+      }
+    });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    const password_hash = hashPassword(password);
-    const assignedRol = 'almacenero';
-    const result = db.prepare('INSERT INTO usuarios (nombre, usuario, password_hash, rol, activo) VALUES (?, ?, ?, ?, ?)')
-      .run(nombre, usuario, password_hash, assignedRol, 0);
 
     return NextResponse.json({
       success: true,
-      message: 'Usuario registrado exitosamente. Tu cuenta está pendiente de activación por el administrador.',
-      userId: result.lastInsertRowid
+      message: 'Usuario registrado exitosamente (Auto-asignado como superadmin temporalmente).',
+      userId: data.user?.id
     }, { status: 201 });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

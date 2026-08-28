@@ -1,45 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const token = authHeader.replace('Bearer ', '').trim();
+    const supabase = await createClient();
+    
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    if (!token) {
-      return NextResponse.json({ error: 'Token no proporcionado' }, { status: 401 });
-    }
-
-    const payload = verifyToken(token);
-    if (!payload) {
+    if (error || !user) {
       return NextResponse.json({ error: 'Token inválido o expirado' }, { status: 401 });
     }
 
-    const db = getDB();
-    const user = db.prepare('SELECT id, nombre, usuario, rol, activo FROM usuarios WHERE id = ?').get(payload.id) as {
-      id: number;
-      nombre: string;
-      usuario: string;
-      rol: string;
-      activo: number;
-    } | undefined;
+    const { data: profile } = await supabase
+      .from('usuarios')
+      .select('id, nombre, rol, activo')
+      .eq('id', user.id)
+      .single();
 
-    if (!user || !user.activo) {
-      return NextResponse.json({ error: 'Usuario no activo o no encontrado' }, { status: 401 });
+    if (profile && profile.activo === 0) {
+      return NextResponse.json({ error: 'Usuario no activo' }, { status: 401 });
     }
 
     return NextResponse.json({
-      user: {
+      user: profile || {
         id: user.id,
-        nombre: user.nombre,
-        usuario: user.usuario,
-        rol: user.rol,
+        usuario: user.email,
+        nombre: user.user_metadata?.nombre || user.email,
+        rol: user.user_metadata?.rol || 'almacenero',
       },
     });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: 'Error al verificar sesión' }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

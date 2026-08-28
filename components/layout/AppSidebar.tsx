@@ -43,13 +43,12 @@ export function AppSidebar() {
 
   const filteredGroups = navigationGroups
     .map((group) => {
-      // Si el grupo tiene items, filtramos sus items por rol
       if (group.items) {
         return {
           ...group,
           items: group.items.filter(
             (item) =>
-              !item.roles || (user?.rol && item.roles.includes(user.rol)),
+              !item.roles || user?.rol === 'superadmin' || (user?.rol && item.roles.includes(user.rol)),
           ),
         };
       }
@@ -58,12 +57,12 @@ export function AppSidebar() {
     .filter((group) => {
       if (!group.roles) return group.items.length > 0;
       return (
-        user?.rol && group.roles.includes(user.rol) && group.items.length > 0
+        (user?.rol === 'superadmin' || (user?.rol && group.roles.includes(user.rol))) && group.items.length > 0
       );
     });
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-border/50">
+    <Sidebar collapsible="icon" className="border-r border-border/50 z-50">
       <SidebarHeader className="h-16 flex flex-row items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-3 group/logo shrink-0">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/20 transition-transform group-hover/logo:scale-105">

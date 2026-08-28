@@ -13,7 +13,7 @@ import { toast } from "sonner";
 export default function RegisterPage() {
   const router = useRouter();
   const [nombre, setNombre] = useState("");
-  const [usuario, setUsuario] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, usuario, password, rol: "almacenero" }),
+        body: JSON.stringify({ nombre, email, password, rol: "almacenero" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -60,17 +60,17 @@ export default function RegisterPage() {
             </div>
             <CardTitle className="text-lg font-bold">¡Registro Exitoso!</CardTitle>
             <CardDescription className="text-xs">
-              Hola <strong>{nombre}</strong>, tu cuenta ha sido registrada con el usuario <strong>{usuario}</strong>.
+              Hola <strong>{nombre}</strong>, tu cuenta ha sido registrada con el correo <strong>{email}</strong>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-center text-xs text-muted-foreground pt-2">
-            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-800 dark:text-amber-300 text-left space-y-1">
+            <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-800 dark:text-blue-300 text-left space-y-1">
               <div className="font-semibold flex items-center gap-1.5 text-xs">
                 <Clock className="h-3.5 w-3.5" />
-                Activación Requerida
+                Verifica tu correo
               </div>
               <p className="text-[11px] leading-relaxed">
-                Por motivos de seguridad, un <strong>Administrador</strong> debe activar tu cuenta antes de que puedas iniciar sesión.
+                Por motivos de seguridad, te hemos enviado un <strong>enlace de verificación</strong> a tu correo. Revisa tu bandeja de entrada y haz clic en el enlace antes de iniciar sesión.
               </p>
             </div>
           </CardContent>
@@ -111,8 +111,8 @@ export default function RegisterPage() {
               <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Juan Perez" required className="h-11" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="usuario" className="text-xs font-semibold">Usuario</Label>
-              <Input id="usuario" value={usuario} onChange={(e) => setUsuario(e.target.value)} placeholder="Ej: jperez" required className="h-11" />
+              <Label htmlFor="email" className="text-xs font-semibold">Correo Electrónico</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Ej: admin@empresa.com" required className="h-11" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-xs font-semibold">Contraseña</Label>

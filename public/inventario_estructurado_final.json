@@ -10,7 +10,8 @@
                 "alto": 0.45,
                 "espesor": 0.15
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Piso 4 B, juego"
         },
         {
             "codigo": "25.33.01.060",
@@ -21,7 +22,8 @@
                 "alto": 0.14,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Piso 4 B, suelto"
         },
         {
             "codigo": "25.33.01.080",
@@ -32,7 +34,8 @@
                 "alto": 0.14,
                 "espesor": 0.14
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Piso 4 B, juego"
         },
         {
             "codigo": "606.05.16",
@@ -43,7 +46,8 @@
                 "alto": 20.0,
                 "espesor": 0.8
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": ""
         },
         {
             "codigo": "801.14.002",
@@ -54,7 +58,8 @@
                 "alto": null,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Piso, Caja"
         },
         {
             "codigo": "801.15.1694",
@@ -65,7 +70,8 @@
                 "alto": 15.03,
                 "espesor": 0.62
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "601.01.1159",
@@ -76,7 +82,8 @@
                 "alto": 12.0,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "602.02.616",
@@ -87,7 +94,8 @@
                 "alto": 17.0,
                 "espesor": 0.57
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "20.90.68.003",
@@ -98,7 +106,8 @@
                 "alto": 10.05,
                 "espesor": 0.83
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "604.06.034",
@@ -109,7 +118,8 @@
                 "alto": 0.43,
                 "espesor": 0.43
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "13.44.12.1225",
@@ -120,7 +130,8 @@
                 "alto": 0.2,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "20.90.73.001",
@@ -131,7 +142,8 @@
                 "alto": 0.83,
                 "espesor": 0.4
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "409.12.1290",
@@ -142,7 +154,8 @@
                 "alto": 10.0,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "604.04.387",
@@ -153,7 +166,8 @@
                 "alto": 0.75,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Rack 1, caja"
         },
         {
             "codigo": "801.15.4693",
@@ -164,7 +178,8 @@
                 "alto": 15.05,
                 "espesor": 0.65
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "604.05.60",
@@ -175,7 +190,8 @@
                 "alto": 0.35,
                 "espesor": 0.35
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, paquetes en caja"
         },
         {
             "codigo": "20.90.47.001",
@@ -186,7 +202,8 @@
                 "alto": 0.74,
                 "espesor": null
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "15.67.01.052",
@@ -197,7 +214,8 @@
                 "alto": 0.25,
                 "espesor": 0.5
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "409.99.115",
@@ -208,7 +226,8 @@
                 "alto": 0.45,
                 "espesor": 0.87
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "605.03.622",
@@ -219,7 +238,8 @@
                 "alto": 0.052,
                 "espesor": 0.145
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "801.15.1532",
@@ -230,7 +250,8 @@
                 "alto": 0.25,
                 "espesor": 10.0
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "20.90.55.001",
@@ -241,7 +262,8 @@
                 "alto": 11.0,
                 "espesor": 15.0
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Bolas"
         },
         {
             "codigo": "801.5.137",
@@ -252,7 +274,8 @@
                 "alto": 0.25,
                 "espesor": 15.0
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Bolza"
         },
         {
             "codigo": "13.24.06.002",
@@ -263,7 +286,8 @@
                 "alto": 0.11,
                 "espesor": 0.55
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "13.24.06.004",
@@ -274,7 +298,8 @@
                 "alto": 0.11,
                 "espesor": 0.55
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "606.07.019",
@@ -285,7 +310,8 @@
                 "alto": 0.75,
                 "espesor": 0.1
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "801.15.1623",
@@ -296,7 +322,8 @@
                 "alto": 10.0,
                 "espesor": 0.05
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Nivel 1, Baza"
         },
         {
             "codigo": "13.05.02.101",
@@ -307,7 +334,8 @@
                 "alto": 0.3,
                 "espesor": 0.5
             },
-            "fecha": "14/08/26"
+            "fecha": "14/08/26",
+            "ubicacion": "Rack 1"
         },
         {
             "codigo": "13.05.02.100",
@@ -318,7 +346,8 @@
                 "alto": 0.45,
                 "espesor": 0.2
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 A, Bolsa"
         },
         {
             "codigo": "608.01.311",
@@ -329,7 +358,8 @@
                 "alto": 11.03,
                 "espesor": 0.2
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 B, Cajas"
         },
         {
             "codigo": "20.90.60.001",
@@ -340,7 +370,8 @@
                 "alto": 0.95,
                 "espesor": 10.0
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 B, paquetes"
         },
         {
             "codigo": "20.90.52.005",
@@ -351,7 +382,8 @@
                 "alto": 10.0,
                 "espesor": 0.48
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 B, empacados"
         },
         {
             "codigo": "20.90.54.006",
@@ -362,7 +394,8 @@
                 "alto": 0.8,
                 "espesor": 0.7
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 B, empacado"
         },
         {
             "codigo": "20.90.56.001",
@@ -373,7 +406,8 @@
                 "alto": 20.0,
                 "espesor": 0.24
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Rack 1, caja"
         },
         {
             "codigo": "20.90.52.008",
@@ -384,7 +418,8 @@
                 "alto": 0.8,
                 "espesor": 0.15
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 B, Bolsa"
         },
         {
             "codigo": "601.01.1159",
@@ -395,7 +430,8 @@
                 "alto": 21.05,
                 "espesor": 10.0
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "15.67.01.045",
@@ -406,7 +442,8 @@
                 "alto": 0.9,
                 "espesor": 0.9
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 C, Bolsa"
         },
         {
             "codigo": "605.03.622",
@@ -417,7 +454,8 @@
                 "alto": 0.53,
                 "espesor": null
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1, caja"
         },
         {
             "codigo": "15.67.01.048",
@@ -428,7 +466,8 @@
                 "alto": 0.89,
                 "espesor": 0.55
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 C, caja"
         },
         {
             "codigo": "607.07.100",
@@ -439,7 +478,8 @@
                 "alto": 11.05,
                 "espesor": 0.4
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 C, Caja"
         },
         {
             "codigo": "801.15.3224",
@@ -450,7 +490,8 @@
                 "alto": 0.35,
                 "espesor": 0.43
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 C, cajas"
         },
         {
             "codigo": "20.90.44.001",
@@ -461,7 +502,8 @@
                 "alto": 11.05,
                 "espesor": 0.63
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 C, caja"
         },
         {
             "codigo": "20.90.24.101",
@@ -472,7 +514,8 @@
                 "alto": 14.05,
                 "espesor": 0.15
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1 C, Bolsa"
         },
         {
             "codigo": "801.15.1486",
@@ -483,7 +526,8 @@
                 "alto": 0.2,
                 "espesor": 0.6
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "801.15.1695",
@@ -494,7 +538,8 @@
                 "alto": 0.5,
                 "espesor": 0.1
             },
-            "fecha": "15/08/26"
+            "fecha": "15/08/26",
+            "ubicacion": "Rack 1, Bolsa"
         },
         {
             "codigo": "15.67.04.018",
@@ -505,7 +550,8 @@
                 "alto": 11.0,
                 "espesor": 0.4
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, Paquetes"
         },
         {
             "codigo": "15.67.04.020",
@@ -516,7 +562,8 @@
                 "alto": 28.05,
                 "espesor": 0.15
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "15.67.04.019",
@@ -527,7 +574,8 @@
                 "alto": 25.0,
                 "espesor": 0.2
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "15.67.04.014",
@@ -538,7 +586,8 @@
                 "alto": 11.05,
                 "espesor": 0.8
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "20.90.08.001",
@@ -549,7 +598,8 @@
                 "alto": 0.55,
                 "espesor": 16.0
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, Cajas"
         },
         {
             "codigo": "13.44.09.001",
@@ -560,7 +610,8 @@
                 "alto": 17.0,
                 "espesor": 26.05
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, Bolsa"
         },
         {
             "codigo": "18.36.02.002",
@@ -571,7 +622,8 @@
                 "alto": 20.03,
                 "espesor": 12.0
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, caja suelto"
         },
         {
             "codigo": "18.48.01.004",
@@ -582,7 +634,8 @@
                 "alto": 32.07,
                 "espesor": 31.0
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 1, caja suelto"
         },
         {
             "codigo": "801.15.2166",
@@ -593,7 +646,8 @@
                 "alto": 0.95,
                 "espesor": 0.7
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja"
         },
         {
             "codigo": "801.15.2168",
@@ -604,7 +658,8 @@
                 "alto": 0.75,
                 "espesor": 0.75
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja"
         },
         {
             "codigo": "801.15.2169",
@@ -615,7 +670,8 @@
                 "alto": 0.8,
                 "espesor": 11.0
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja"
         },
         {
             "codigo": "801.15.2167",
@@ -626,7 +682,8 @@
                 "alto": 0.48,
                 "espesor": 19.07
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja"
         },
         {
             "codigo": "801.15.2171",
@@ -637,7 +694,8 @@
                 "alto": 10.05,
                 "espesor": 0.53
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Rack 1, suelto"
         },
         {
             "codigo": "19.04.02.015",
@@ -648,7 +706,8 @@
                 "alto": 14.05,
                 "espesor": 14.05
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, Bolsa"
         },
         {
             "codigo": "605.03.402.24",
@@ -659,7 +718,8 @@
                 "alto": 0.78,
                 "espesor": 0.78
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja"
         },
         {
             "codigo": "20.90.52.012",
@@ -670,7 +730,8 @@
                 "alto": 10.02,
                 "espesor": 0.05
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, Bolsa"
         },
         {
             "codigo": "409.12.1079",
@@ -681,7 +742,8 @@
                 "alto": 22.06,
                 "espesor": 0.001
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, Suelto"
         },
         {
             "codigo": "801.01.261",
@@ -692,7 +754,8 @@
                 "alto": 0.6,
                 "espesor": 0.65
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, Suelto"
         },
         {
             "codigo": "18.48.01.003",
@@ -703,7 +766,8 @@
                 "alto": 31.0,
                 "espesor": 12.0
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, suelto"
         },
         {
             "codigo": "801.15.1251",
@@ -714,7 +778,8 @@
                 "alto": 18.0,
                 "espesor": 0.71
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja"
         },
         {
             "codigo": "409.18.771",
@@ -725,7 +790,8 @@
                 "alto": null,
                 "espesor": null
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Level 4, caja"
         },
         {
             "codigo": "20.82.02.114.102",
@@ -736,7 +802,8 @@
                 "alto": 33.0,
                 "espesor": 1.95
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Suelo, caja"
         },
         {
             "codigo": "801.15.2165",
@@ -747,7 +814,8 @@
                 "alto": 35.0,
                 "espesor": 25.0
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Suelo, Bolsa"
         },
         {
             "codigo": "801.15.3868",
@@ -758,7 +826,8 @@
                 "alto": 22.05,
                 "espesor": 12.0
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Suelo, caja H"
         },
         {
             "codigo": "801.15.4017",
@@ -769,7 +838,8 @@
                 "alto": 0.4,
                 "espesor": null
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja J"
         },
         {
             "codigo": "801.15.4014",
@@ -780,7 +850,8 @@
                 "alto": 17.0,
                 "espesor": 11.0
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja J"
         },
         {
             "codigo": "801.15.4016",
@@ -791,7 +862,8 @@
                 "alto": 13.05,
                 "espesor": 13.05
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja J"
         },
         {
             "codigo": "15.80.16.340038",
@@ -802,7 +874,8 @@
                 "alto": 26.0,
                 "espesor": null
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 2, Suelto"
         },
         {
             "codigo": "801.15.4027",
@@ -813,7 +886,8 @@
                 "alto": 24.0,
                 "espesor": 0.05
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja J"
         },
         {
             "codigo": "18.33.004.12",
@@ -824,7 +898,8 @@
                 "alto": 40.0,
                 "espesor": 10.05
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "603.01.1300",
@@ -835,7 +910,8 @@
                 "alto": 50.0,
                 "espesor": 24.0
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja"
         },
         {
             "codigo": "604.04.212",
@@ -846,7 +922,8 @@
                 "alto": 0.4,
                 "espesor": 0.4
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "13.31.01.050.220.002",
@@ -857,7 +934,8 @@
                 "alto": 24.05,
                 "espesor": 27.0
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "20.83.01.114.101",
@@ -868,7 +946,8 @@
                 "alto": 21.0,
                 "espesor": null
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "28.06.07.223",
@@ -879,7 +958,8 @@
                 "alto": 25.0,
                 "espesor": 0.9
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "20.32.09.001",
@@ -890,7 +970,8 @@
                 "alto": 30.0,
                 "espesor": 7.0
             },
-            "fecha": "19/08/26"
+            "fecha": "19/08/26",
+            "ubicacion": ""
         },
         {
             "codigo": "27.1.05.002",
@@ -901,7 +982,8 @@
                 "alto": 28.0,
                 "espesor": 10.0
             },
-            "fecha": "19/08/26"
+            "fecha": "19/08/26",
+            "ubicacion": "Nivel 3, Caja"
         },
         {
             "codigo": "801.15.1985",
@@ -912,7 +994,8 @@
                 "alto": 31.0,
                 "espesor": 51.0
             },
-            "fecha": "19/08/26"
+            "fecha": "19/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "801.15.1000.3",
@@ -923,7 +1006,8 @@
                 "alto": 49.0,
                 "espesor": 44.0
             },
-            "fecha": "19/08/26"
+            "fecha": "19/08/26",
+            "ubicacion": "Nivel 2, Suelto"
         },
         {
             "codigo": "13.98.01.015",
@@ -934,7 +1018,8 @@
                 "alto": 47.0,
                 "espesor": 39.0
             },
-            "fecha": "19/08/26"
+            "fecha": "19/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "13.98.01.016",
@@ -945,7 +1030,8 @@
                 "alto": 28.0,
                 "espesor": 13.0
             },
-            "fecha": "19/08/26"
+            "fecha": "19/08/26",
+            "ubicacion": "Nivel 2, Caja"
         },
         {
             "codigo": "RPTS01S01000071",
@@ -956,7 +1042,8 @@
                 "alto": 0.35,
                 "espesor": 0.35
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja K"
         },
         {
             "codigo": "RPTS01S01000070",
@@ -967,7 +1054,8 @@
                 "alto": 0.45,
                 "espesor": 0.45
             },
-            "fecha": "18/08/26"
+            "fecha": "18/08/26",
+            "ubicacion": "Nivel 1, Caja K"
         },
         {
             "codigo": "RPTS01S10000530",
@@ -978,7 +1066,8 @@
                 "alto": 0.7,
                 "espesor": 0.7
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Level 4, caja"
         },
         {
             "codigo": "RPTS01S10000532",
@@ -989,7 +1078,8 @@
                 "alto": 16.0,
                 "espesor": 0.92
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Rack 1"
         },
         {
             "codigo": "RPTS01S10000072",
@@ -1000,7 +1090,8 @@
                 "alto": 3.05,
                 "espesor": 0.8
             },
-            "fecha": "17/08/26"
+            "fecha": "17/08/26",
+            "ubicacion": "Nivel 2, caja suelto"
         }
     ]
 }

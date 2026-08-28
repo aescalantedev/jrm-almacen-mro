@@ -1,28 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-
-function fieldsKey(obj: Record<string, unknown>, key: string) {
-  return obj[key];
-}
+import { createClient } from '@/lib/supabase/server';
 
 export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
     const resolvedParams = await context.params;
     const body = await req.json();
     const { id: bodyId, ...fields } = body;
     const id = bodyId || resolvedParams?.id;
     if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
-    const existing = db.prepare(`
-      SELECT i.*, p.costo_unitario_actual as costo_unitario, p.peso_neto as peso_aprox_unitario
-      FROM inventario i
-      JOIN productos p ON i.producto = p.sku
-      WHERE i.id = ?
-    `).get(id) as Record<string, unknown> | undefined;
-    if (!existing) return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 });
+
+    const { data: existing, error: existError } = await supabase
+      .from('v_inventario')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (existError || !existing) return NextResponse.json({ error: 'Registro no encontrado' }, { status: 404 });
+
     const allowedFields = [
       'cantidad_fisica', 'observacion', 'comentario', 'rack', 'ubicacion_actual',
       'almacenamiento', 'contenedor', 'responsable', 'fecha_conteo', 'foto_path',
@@ -30,28 +28,41 @@ export async function PUT(
       'alto', 'rotacion', 'linea', 'prioridad', 'vida_util_ssoma',
       'compatibilidad_segregacion', 'condiciones_almacenamiento'
     ];
-    const updates: string[] = [];
-    const values: unknown[] = [];
+
+    const updates: any = {};
     for (const field of allowedFields) {
-      if (fieldsKey(fields, field) !== undefined) { updates.push(`${field} = ?`); values.push(fields[field]); }
+      if (fields[field] !== undefined) {
+        updates[field] = fields[field];
+      }
     }
-    if (updates.length === 0) return NextResponse.json({ error: 'No hay campos para actualizar' }, { status: 400 });
-    updates.push("updated_at = datetime('now', '-5 hours')");
-    const newCantFisica = fields.cantidad_fisica !== undefined ? fields.cantidad_fisica : existing.cantidad_fisica;
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No hay campos para actualizar' }, { status: 400 });
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const newCantFisica = fields.cantidad_fisica !== undefined ? Number(fields.cantidad_fisica) : Number(existing.cantidad_fisica);
     const stockSis = Number(existing.stock_sistema || 0);
     const costoUnit = Number(existing.costo_unitario || 0);
     const pesoUnit = Number(existing.peso_aprox_unitario || 0);
-    const dif = (newCantFisica as number) - (stockSis as number);
-    updates.push('dif = ?'); values.push(dif);
-    updates.push('peso_total_cant_fisica = ?'); values.push((newCantFisica as number) * pesoUnit);
-    updates.push('total_costo = ?'); values.push(stockSis * costoUnit);
-    updates.push('s_dif = ?'); values.push(dif * costoUnit);
-    if (!fields.observacion) { updates.push('observacion = ?'); values.push(dif > 0 ? 'SOBRANTE' : dif < 0 ? 'FALTANTE' : 'OK'); }
-    values.push(id);
-    db.prepare(`UPDATE inventario SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    const dif = newCantFisica - stockSis;
+
+    updates.dif = dif;
+    updates.peso_total_cant_fisica = newCantFisica * pesoUnit;
+    updates.total_costo = stockSis * costoUnit;
+    updates.s_dif = dif * costoUnit;
+    
+    if (!fields.observacion) {
+      updates.observacion = dif > 0 ? 'SOBRANTE' : dif < 0 ? 'FALTANTE' : 'OK';
+    }
+
+    const { error: updateError } = await supabase.from('inventario').update(updates).eq('id', id);
+    if (updateError) throw updateError;
+
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
@@ -60,14 +71,18 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
     const resolvedParams = await context.params;
     const { searchParams } = new URL(req.url);
     const id = resolvedParams?.id || searchParams.get('id');
+    
     if (!id) return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
-    db.prepare('DELETE FROM inventario WHERE id = ?').run(parseInt(String(id)));
+
+    const { error } = await supabase.from('inventario').delete().eq('id', id);
+    if (error) throw error;
+
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

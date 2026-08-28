@@ -1,64 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
 
-    // 1. Tendencia de los últimos 30 días con movimientos
-    const tendencia = db.prepare(`
-      SELECT 
-        date(created_at) as fecha,
-        SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as ingresos,
-        SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as salidas,
-        COUNT(*) as total_movimientos
-      FROM movimientos
-      WHERE created_at >= date('now', '-30 days')
-      GROUP BY date(created_at)
-      ORDER BY fecha ASC
-    `).all();
+    // In Supabase without RPC, doing complex group-bys requires either views or fetching raw and reducing in JS.
+    // Since this is for a dashboard of recent data, we will fetch the raw data for the last 30 days.
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const dateLimit = thirtyDaysAgo.toISOString();
 
-    // 2. Distribución de motivos de salida
-    const motivosSalida = db.prepare(`
-      SELECT 
-        COALESCE(NULLIF(motivo, ''), 'Salida de Almacén') as name,
-        COUNT(*) as count,
-        SUM(cantidad) as value
-      FROM movimientos
-      WHERE tipo = 'SALIDA'
-      GROUP BY name
-      ORDER BY value DESC
-      LIMIT 8
-    `).all();
+    const { data: rawMovs, error } = await supabase
+      .from('v_movimientos')
+      .select('tipo, cantidad, motivo, producto, descripcion, unidad, solicitante, created_at')
+      .gte('created_at', dateLimit);
 
-    // 3. Top 10 productos con mayor salida / rotación
-    const topSalidas = db.prepare(`
-      SELECT 
-        m.producto,
-        COALESCE(p.glosa, m.producto) as glosa,
-        COALESCE(p.unidad_codigo, 'UND') as unidad,
-        SUM(m.cantidad) as total_despachado,
-        COUNT(*) as frecuencia
-      FROM movimientos m
-      LEFT JOIN productos p ON m.producto = p.sku
-      WHERE m.tipo = 'SALIDA'
-      GROUP BY m.producto
-      ORDER BY total_despachado DESC
-      LIMIT 10
-    `).all();
+    if (error) throw error;
+    
+    const movs = rawMovs || [];
 
-    // 4. Top solicitantes / áreas
-    const topSolicitantes = db.prepare(`
-      SELECT 
-        CASE WHEN solicitante IS NULL OR solicitante = '' THEN 'Sin especificar' ELSE solicitante END as solicitante,
-        COUNT(*) as despachos,
-        SUM(cantidad) as unidades
-      FROM movimientos
-      WHERE tipo = 'SALIDA'
-      GROUP BY solicitante
-      ORDER BY despachos DESC
-      LIMIT 8
-    `).all();
+    // 1. Tendencia
+    const tendenciaMap: Record<string, any> = {};
+    const motivosSalidaMap: Record<string, any> = {};
+    const topSalidasMap: Record<string, any> = {};
+    const topSolicitantesMap: Record<string, any> = {};
+
+    movs.forEach(m => {
+      // 1. Tendencia
+      const fecha = m.created_at ? m.created_at.split('T')[0] : 'N/A';
+      if (!tendenciaMap[fecha]) {
+        tendenciaMap[fecha] = { fecha, ingresos: 0, salidas: 0, total_movimientos: 0 };
+      }
+      tendenciaMap[fecha].total_movimientos++;
+      if (m.tipo === 'INGRESO') tendenciaMap[fecha].ingresos += Number(m.cantidad);
+      if (m.tipo === 'SALIDA') {
+        tendenciaMap[fecha].salidas += Number(m.cantidad);
+
+        // 2. Motivos
+        const motivo = m.motivo || 'Salida de Almacén';
+        if (!motivosSalidaMap[motivo]) motivosSalidaMap[motivo] = { name: motivo, count: 0, value: 0 };
+        motivosSalidaMap[motivo].count++;
+        motivosSalidaMap[motivo].value += Number(m.cantidad);
+
+        // 3. Top Salidas
+        if (!topSalidasMap[m.producto]) topSalidasMap[m.producto] = { 
+          producto: m.producto, glosa: m.descripcion || m.producto, unidad: m.unidad || 'UND', total_despachado: 0, frecuencia: 0 
+        };
+        topSalidasMap[m.producto].total_despachado += Number(m.cantidad);
+        topSalidasMap[m.producto].frecuencia++;
+
+        // 4. Solicitantes
+        const solicitante = m.solicitante || 'Sin especificar';
+        if (!topSolicitantesMap[solicitante]) topSolicitantesMap[solicitante] = { solicitante, despachos: 0, unidades: 0 };
+        topSolicitantesMap[solicitante].despachos++;
+        topSolicitantesMap[solicitante].unidades += Number(m.cantidad);
+      }
+    });
+
+    const tendencia = Object.values(tendenciaMap).sort((a: any, b: any) => a.fecha.localeCompare(b.fecha));
+    const motivosSalida = Object.values(motivosSalidaMap).sort((a: any, b: any) => b.value - a.value).slice(0, 8);
+    const topSalidas = Object.values(topSalidasMap).sort((a: any, b: any) => b.total_despachado - a.total_despachado).slice(0, 10);
+    const topSolicitantes = Object.values(topSolicitantesMap).sort((a: any, b: any) => b.despachos - a.despachos).slice(0, 8);
 
     return NextResponse.json({
       tendencia,
@@ -66,8 +70,7 @@ export async function GET(req: NextRequest) {
       top_salidas: topSalidas,
       top_solicitantes: topSolicitantes,
     });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

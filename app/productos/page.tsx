@@ -24,6 +24,7 @@ import {
   Boxes,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +90,7 @@ export default function ProductosPage() {
   const [newProductOpen, setNewProductOpen] = useState(false);
   const [multiEditOpen, setMultiEditOpen] = useState(false);
   const [deletingMultiple, setDeletingMultiple] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cart hook (Vales de Ingreso y Salida y Conteo)
@@ -107,7 +109,7 @@ export default function ProductosPage() {
     cancelMovement,
   } = useMovementCart();
 
-  const isAdmin = user?.rol === "admin" || user?.rol === "auditor";
+  const isAdmin = user?.rol === "admin" || user?.rol === "auditor" || user?.rol === "superadmin";
 
   const getToken = () => {
     if (authToken) return authToken;
@@ -310,10 +312,13 @@ export default function ProductosPage() {
     );
   };
 
-  const handleDeleteSelected = async () => {
+  const confirmDeleteSelected = () => {
     if (selectedSkus.length === 0) return;
-    if (!confirm(`¿Estás seguro de eliminar los ${selectedSkus.length} productos seleccionados? Esta acción no se puede deshacer.`)) return;
+    setDeleteConfirmOpen(true);
+  };
 
+  const executeDeleteSelected = async () => {
+    setDeleteConfirmOpen(false);
     setDeletingMultiple(true);
     try {
       const res = await fetch("/api/productos", {
@@ -419,7 +424,7 @@ export default function ProductosPage() {
                   type="button"
                   size="sm"
                   variant="destructive"
-                  onClick={handleDeleteSelected}
+                  onClick={confirmDeleteSelected}
                   disabled={deletingMultiple}
                   className="h-7.5 px-3 text-xs font-bold gap-1 rounded-lg"
                 >
@@ -925,6 +930,29 @@ export default function ProductosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DIALOG DE CONFIRMACION DE ELIMINACION */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar productos?</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas eliminar los {selectedSkus.length} productos seleccionados?
+              Esta acción no se puede deshacer y borrará el historial de estos productos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingMultiple}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={executeDeleteSelected}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingMultiple}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

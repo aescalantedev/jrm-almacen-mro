@@ -1,28 +1,13 @@
 import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
-import { getDB } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET() {
   try {
-    const db = getDB();
-    const rows = db.prepare(`
-      SELECT i.*, p.glosa as descripcion, p.unidad_codigo as unidad, COALESCE(g.nombre, 'GENERAL') as familia, p.peso_neto as peso_aprox_unitario,
-             p.costo_unitario_actual as costo_unitario,
-             (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema,
-             COALESCE(m.total_ingresos, 0) as total_ingresos,
-             COALESCE(m.total_salidas, 0) as total_salidas
-      FROM inventario i
-      JOIN productos p ON i.producto = p.sku
-      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN (
-        SELECT producto, IFNULL(lote, '') as m_lote,
-               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
-               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
-        FROM movimientos
-        GROUP BY producto, IFNULL(lote, '')
-      ) m ON i.producto = m.producto AND IFNULL(i.lote, '') = m.m_lote
-      ORDER BY i.id ASC
-    `).all() as Record<string, unknown>[];
+    const supabase = await createClient();
+    const { data: rowsData, error } = await supabase.from('v_inventario_export').select('*').order('id', { ascending: true });
+    if (error) throw error;
+    const rows = rowsData || [];
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'StrixUI Inventory System';
@@ -164,72 +149,23 @@ export async function GET() {
     // ──────────────────────────────────────────────────────────────────
 
     // Queries para IRA
-    const auditadosRow = db.prepare(`
-      SELECT COUNT(*) as c FROM inventario
-      WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
-    const auditados = auditadosRow.c;
-
-    const conformesRow = db.prepare(`
-      SELECT COUNT(*) as c FROM inventario
-      WHERE observacion = 'OK' AND dif = 0
-        AND cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
-    const conformes = conformesRow.c;
-
-    const totalSKURow = db.prepare('SELECT COUNT(*) as c FROM inventario').get() as { c: number };
-    const totalSKU = totalSKURow.c;
+    const auditados = rows.filter(r => r.cantidad_fisica !== null && Number(r.cantidad_fisica) !== 0).length;
+    const conformes = rows.filter(r => r.observacion === 'OK' && Number(r.dif) === 0 && r.cantidad_fisica !== null && Number(r.cantidad_fisica) !== 0).length;
+    const totalSKU = rows.length;
 
     const iraSKU = auditados > 0 ? (conformes / auditados) * 100 : 0;
 
-    const valorFisicoRow = db.prepare(`
-      SELECT COALESCE(SUM(i.cantidad_fisica * p.costo_unitario_actual), 0) as v
-      FROM inventario i JOIN productos p ON i.producto = p.sku
-    `).get() as { v: number };
-
-    const valorSistemaRow = { v: valorFisicoRow.v };
-
-    const valorFisico = valorFisicoRow.v;
-    const valorSistema = valorSistemaRow.v;
-    const iraFinanciera = valorSistema > 0
-      ? (1 - Math.abs(valorFisico - valorSistema) / valorSistema) * 100
-      : 100;
+    const valorFisico = rows.reduce((acc, r) => acc + (Number(r.cantidad_fisica || 0) * Number(r.costo_unitario || 0)), 0);
+    const valorSistema = valorFisico; // Preserving original logic
+    const iraFinanciera = valorSistema > 0 ? (1 - Math.abs(valorFisico - valorSistema) / valorSistema) * 100 : 100;
 
     const descalceNeto = valorFisico - valorSistema;
+    const descalceBruto = rows.reduce((acc, r) => acc + Math.abs(Number(r.dif || 0)), 0);
 
-    const descalceBrutoRow = db.prepare(`
-      SELECT COALESCE(SUM(ABS(i.dif)), 0) as v FROM inventario i
-    `).get() as { v: number };
-    const descalceBruto = descalceBrutoRow.v;
+    const totalFaltantesRow = { c: rows.filter(r => r.observacion === 'FALTANTE' && r.cantidad_fisica !== null && Number(r.cantidad_fisica) !== 0).length };
+    const totalSobrantesRow = { c: rows.filter(r => r.observacion === 'SOBRANTE' && r.cantidad_fisica !== null && Number(r.cantidad_fisica) !== 0).length };
 
-    const totalFaltantesRow = db.prepare(`
-      SELECT COUNT(*) as c FROM inventario
-      WHERE observacion = 'FALTANTE' AND cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
-    const totalSobrantesRow = db.prepare(`
-      SELECT COUNT(*) as c FROM inventario
-      WHERE observacion = 'SOBRANTE' AND cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-    `).get() as { c: number };
-
-    // ABC: Clasificar por valor de sistema (stock × costo)
-    const inventarioRows = db.prepare(`
-      SELECT i.producto, p.glosa as descripcion, COALESCE(g.nombre, 'GENERAL') as familia,
-             COALESCE(i.cantidad_fisica, 0) as stock_sistema,
-             i.cantidad_fisica,
-             i.dif,
-             p.costo_unitario_actual as costo_unitario,
-             (COALESCE(i.cantidad_fisica, 0) * p.costo_unitario_actual) as valor_sistema
-      FROM inventario i
-      JOIN productos p ON i.producto = p.sku
-      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN (
-        SELECT producto, IFNULL(lote, '') as m_lote,
-               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
-               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
-        FROM movimientos
-        GROUP BY producto, IFNULL(lote, '')
-      ) m ON i.producto = m.producto AND IFNULL(i.lote, '') = m.m_lote
-    `).all() as Record<string, unknown>[];
+    const inventarioRows = rows.map(r => ({ ...r, valor_sistema: Number(r.cantidad_fisica || 0) * Number(r.costo_unitario || 0) }));
 
     // Calcular valor total para umbrales ABC
     const valorTotal = inventarioRows.reduce((acc, r) => acc + Number(r.valor_sistema || 0), 0);
@@ -266,38 +202,32 @@ export async function GET() {
     }
 
     // Top impacto monetario
-    const topImpacto = db.prepare(`
-      SELECT i.producto, p.glosa as descripcion, COALESCE(g.nombre, 'GENERAL') as familia,
-             COALESCE(i.cantidad_fisica, 0) as stock_sistema,
-             i.cantidad_fisica, i.dif,
-             p.costo_unitario_actual as costo_unitario,
-             i.dif * p.costo_unitario_actual as impacto_monetario
-      FROM inventario i
-      JOIN productos p ON i.producto = p.sku
-      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN (
-        SELECT producto, IFNULL(lote, '') as m_lote,
-               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
-               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
-        FROM movimientos
-        GROUP BY producto, IFNULL(lote, '')
-      ) m ON i.producto = m.producto AND IFNULL(i.lote, '') = m.m_lote
-      WHERE i.dif != 0 AND i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0
-      ORDER BY ABS(i.dif * p.costo_unitario_actual) DESC
-      LIMIT 10
-    `).all() as Record<string, unknown>[];
+    const topImpacto = [...rows]
+      .filter(r => Number(r.dif) !== 0 && r.cantidad_fisica !== null && Number(r.cantidad_fisica) !== 0)
+      .map(r => ({
+        producto: r.producto,
+        descripcion: r.descripcion,
+        familia: r.familia,
+        stock_sistema: r.cantidad_fisica,
+        cantidad_fisica: r.cantidad_fisica,
+        dif: r.dif,
+        costo_unitario: r.costo_unitario,
+        impacto_monetario: Number(r.dif) * Number(r.costo_unitario || 0)
+      }))
+      .sort((a, b) => Math.abs(b.impacto_monetario) - Math.abs(a.impacto_monetario))
+      .slice(0, 10);
 
     // Causa raíz
-    const causaRaiz = db.prepare(`
-      SELECT
-        observacion,
-        COUNT(*) as cantidad,
-        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM inventario WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0), 1) as porcentaje
-      FROM inventario
-      WHERE cantidad_fisica IS NOT NULL AND cantidad_fisica != 0
-      GROUP BY observacion
-      ORDER BY cantidad DESC
-    `).all() as Record<string, unknown>[];
+    const causaMap = new Map<string, number>();
+    rows.filter(r => r.cantidad_fisica !== null && Number(r.cantidad_fisica) !== 0).forEach(r => {
+      const obs = String(r.observacion || '');
+      causaMap.set(obs, (causaMap.get(obs) || 0) + 1);
+    });
+    const causaRaiz = Array.from(causaMap.entries()).map(([obs, count]) => ({
+      observacion: obs,
+      cantidad: count,
+      porcentaje: auditados > 0 ? (count * 100.0 / auditados) : 0
+    })).sort((a, b) => b.cantidad - a.cantidad);
 
     // Crear hoja IRA
     const wsIRA = workbook.addWorksheet('IRA - Informe', {
@@ -666,52 +596,93 @@ export async function GET() {
     wsResumen.getRow(rowM).height = 20;
     rowM += 2;
 
-    // Consultas de movimientos
-    const movStats = db.prepare(`
-      SELECT 
-        COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN 1 ELSE 0 END), 0) as ingresos_count,
-        COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN 1 ELSE 0 END), 0) as salidas_count,
-        COALESCE(SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END), 0) as total_unidades_ingresadas,
-        COALESCE(SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END), 0) as total_unidades_salidas,
-        COUNT(*) as total_movimientos
-      FROM movimientos
-    `).get() as {
-      ingresos_count: number;
-      salidas_count: number;
-      total_unidades_ingresadas: number;
-      total_unidades_salidas: number;
-      total_movimientos: number;
+    // Consultas de movimientos (Supabase JS Aggregation)
+    const { data: allMovs } = await supabase
+      .from('movimientos')
+      .select('*, productos!inner(glosa, unidad_codigo), usuarios!left(nombre)')
+      .order('created_at', { ascending: false });
+      
+    const movs = allMovs || [];
+
+    const movStats = {
+      ingresos_count: 0,
+      salidas_count: 0,
+      total_unidades_ingresadas: 0,
+      total_unidades_salidas: 0,
+      total_movimientos: movs.length
     };
 
-    const motivosData = db.prepare(`
-      SELECT motivo, COUNT(*) as count, COALESCE(SUM(cantidad), 0) as total_unidades
-      FROM movimientos
-      WHERE tipo = 'SALIDA'
-      GROUP BY motivo
-      ORDER BY total_unidades DESC
-    `).all() as { motivo: string; count: number; total_unidades: number }[];
+    const motivosMap = new Map();
+    const rotacionMap = new Map();
+    const solicitantesMap = new Map();
 
-    const topRotacion = db.prepare(`
-      SELECT m.producto, p.glosa as descripcion, p.unidad_codigo as unidad, COALESCE(SUM(m.cantidad), 0) as total_despachado, COUNT(*) as despachos
-      FROM movimientos m
-      JOIN productos p ON m.producto = p.sku
-      WHERE m.tipo = 'SALIDA'
-      GROUP BY m.producto
-      ORDER BY total_despachado DESC
-      LIMIT 15
-    `).all() as { producto: string; descripcion: string; unidad: string; total_despachado: number; despachos: number }[];
+    const kardexRows = [];
 
-    const topSolicitantes = db.prepare(`
-      SELECT CASE WHEN solicitante = '' THEN 'Sin especificar' ELSE solicitante END as solicitante,
-             COUNT(*) as despachos, COALESCE(SUM(cantidad), 0) as total_unidades
-      FROM movimientos
-      WHERE tipo = 'SALIDA'
-      GROUP BY solicitante
-      ORDER BY despachos DESC
-      LIMIT 10
-    `).all() as { solicitante: string; despachos: number; total_unidades: number }[];
+    for (const m of movs) {
+      // 1. Stats
+      if (m.tipo === 'INGRESO') {
+        movStats.ingresos_count++;
+        movStats.total_unidades_ingresadas += Number(m.cantidad) || 0;
+      } else if (m.tipo === 'SALIDA') {
+        movStats.salidas_count++;
+        movStats.total_unidades_salidas += Number(m.cantidad) || 0;
 
-    // ── SECCIÓN 1: KPIs GENERALES DE MOVIMIENTOS ──
+        // Motivos (solo salidas)
+        const mot = m.motivo || 'OTROS';
+        const currentMot = motivosMap.get(mot) || { motivo: mot, count: 0, total_unidades: 0 };
+        currentMot.count++;
+        currentMot.total_unidades += Number(m.cantidad) || 0;
+        motivosMap.set(mot, currentMot);
+
+        // Top Rotacion (solo salidas)
+        const prod = m.producto;
+        const currentRot = rotacionMap.get(prod) || { 
+          producto: prod, 
+          descripcion: m.productos?.glosa || '', 
+          unidad: m.productos?.unidad_codigo || '', 
+          total_despachado: 0, 
+          despachos: 0 
+        };
+        currentRot.total_despachado += Number(m.cantidad) || 0;
+        currentRot.despachos++;
+        rotacionMap.set(prod, currentRot);
+
+        // Solicitantes (solo salidas)
+        const sol = m.solicitante ? m.solicitante.trim() : 'Sin especificar';
+        const finalSol = sol === '' ? 'Sin especificar' : sol;
+        const currentSol = solicitantesMap.get(finalSol) || { solicitante: finalSol, despachos: 0, total_unidades: 0 };
+        currentSol.despachos++;
+        currentSol.total_unidades += Number(m.cantidad) || 0;
+        solicitantesMap.set(finalSol, currentSol);
+      }
+
+      // Kardex Rows
+      kardexRows.push({
+        id: m.id,
+        created_at: m.created_at,
+        tipo: m.tipo,
+        producto: m.producto,
+        descripcion: m.productos?.glosa || '',
+        unidad: m.productos?.unidad_codigo || '',
+        lote: m.lote,
+        cantidad: m.cantidad,
+        stock_anterior: m.stock_anterior,
+        stock_resultante: m.stock_resultante,
+        motivo: m.motivo,
+        documento_referencia: m.documento_referencia,
+        solicitante: m.solicitante,
+        rack: m.rack,
+        usuario_nombre: m.usuarios?.nombre || 'Desconocido'
+      });
+    }
+
+    const motivosData = Array.from(motivosMap.values()).sort((a, b) => b.total_unidades - a.total_unidades);
+    const topRotacion = Array.from(rotacionMap.values()).sort((a, b) => b.total_despachado - a.total_despachado).slice(0, 15);
+    const topSolicitantes = Array.from(solicitantesMap.values()).sort((a, b) => b.total_unidades - a.total_unidades).slice(0, 10);
+
+    // Ensure we keep the original comment or merge cell
+    // The eIdx points to the 'wsResumen.mergeCells...' so we don't need to add it, just concatenate
+    // SECCIÓN 1: KPIs GENERALES DE MOVIMIENTOS ──
     wsResumen.mergeCells(`B${rowM}:G${rowM}`);
     const secMov1 = wsResumen.getCell(`B${rowM}`);
     secMov1.value = '1. Indicadores Generales de Movimientos';
@@ -970,31 +941,7 @@ export async function GET() {
       wsKardex.getColumn(i + 1).width = kh.width;
     });
 
-    const kardexRows = db.prepare(`
-      SELECT m.id, m.created_at, m.tipo, m.producto, p.glosa as descripcion, p.unidad_codigo as unidad, m.lote,
-             m.cantidad, m.stock_anterior, m.stock_resultante, m.motivo, m.documento_referencia,
-             m.solicitante, m.rack, u.nombre as usuario_nombre
-      FROM movimientos m
-      JOIN productos p ON m.producto = p.sku
-      LEFT JOIN usuarios u ON m.usuario_id = u.id
-      ORDER BY m.created_at DESC, m.id DESC
-    `).all() as {
-      id: number;
-      created_at: string;
-      tipo: string;
-      producto: string;
-      descripcion: string;
-      unidad: string;
-      lote: string;
-      cantidad: number;
-      stock_anterior: number;
-      stock_resultante: number;
-      motivo: string;
-      documento_referencia: string;
-      solicitante: string;
-      rack: string;
-      usuario_nombre: string;
-    }[];
+    
 
     kardexRows.forEach((kr, idx) => {
       const rNum = 4 + idx;

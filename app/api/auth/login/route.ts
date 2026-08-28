@@ -1,27 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-import { comparePassword, generateToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { usuario, password } = await req.json();
-    if (!usuario || !password) {
-      return NextResponse.json({ error: 'Campos requeridos: usuario, password' }, { status: 400 });
+    const { email, password } = await req.json();
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Campos requeridos: email, password' }, { status: 400 });
     }
-    const db = getDB();
-    const user = db.prepare('SELECT id, nombre, usuario, password_hash, rol, activo FROM usuarios WHERE usuario = ?')
-      .get(usuario) as { id: number; nombre: string; usuario: string; password_hash: string; rol: string; activo: number } | undefined;
-    if (!user) return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 401 });
-    if (!comparePassword(password, user.password_hash)) {
-      return NextResponse.json({ error: 'Contraseña incorrecta' }, { status: 401 });
+
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: 'Credenciales incorrectas o usuario no encontrado' }, { status: 401 });
     }
-    if (!user.activo) {
-      return NextResponse.json({ error: 'Tu cuenta está registrada pero aún no ha sido activada por el administrador.' }, { status: 403 });
+
+    // Obtener datos del perfil
+    const { data: profile, error: dbError } = await supabase
+      .from('usuarios')
+      .select('id, nombre, rol, activo')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profile && profile.activo === 0) {
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: 'Tu cuenta está inactiva' }, { status: 403 });
     }
-    const token = generateToken({ id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol as 'contador' | 'admin' | 'almacenero' | 'auditor' });
-    return NextResponse.json({ user: { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol }, token });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+
+    return NextResponse.json({ 
+      user: profile || { 
+        id: data.user.id, 
+        usuario: email, 
+        nombre: data.user.user_metadata?.nombre || email,
+        rol: data.user.user_metadata?.rol || 'almacenero' 
+      },
+      token: data.session?.access_token // Frontend expects a token
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

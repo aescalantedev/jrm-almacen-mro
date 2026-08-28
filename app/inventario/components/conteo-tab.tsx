@@ -54,9 +54,10 @@ interface ConteoTabProps {
   clearForm: () => void;
   searchStock: (queryOverride?: string, autoSelectExact?: boolean) => Promise<void>;
   selectStock: (item: StockItem) => void;
-  handleSave: () => Promise<void>;
+  handleSave: (conCierre: boolean) => Promise<void>;
   catalogCount: number;
   onGoToCatalogo: () => void;
+  onNewProduct?: () => void;
 }
 
 export function ConteoTab({
@@ -80,6 +81,7 @@ export function ConteoTab({
   handleSave,
   catalogCount,
   onGoToCatalogo,
+  onNewProduct,
 }: ConteoTabProps) {
   const [uploading, setUploading] = React.useState(false);
   const [scannerOpen, setScannerOpen] = React.useState(false);
@@ -206,6 +208,18 @@ export function ConteoTab({
             </div>
           </div>
 
+          {searchQuery.length >= 2 && !searching && stockResults.length === 0 && (
+            <div className="pt-6 pb-4 text-center space-y-3 flex flex-col items-center">
+              <p className="text-sm text-muted-foreground">No se encontraron resultados para "{searchQuery}"</p>
+              {onNewProduct && (
+                <Button type="button" onClick={onNewProduct} variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Registrar Nuevo Producto
+                </Button>
+              )}
+            </div>
+          )}
+
           {stockResults.length > 0 && (
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold px-1">
@@ -326,7 +340,7 @@ export function ConteoTab({
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleSave();
+                handleSave(false);
               }}
               className="space-y-6"
             >

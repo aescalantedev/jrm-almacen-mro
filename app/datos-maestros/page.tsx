@@ -231,7 +231,7 @@ export default function DatosMaestrosPage() {
   };
 
   // Restrict to Admin
-  if (user && user.rol !== "admin") {
+  if (user && user.rol !== "admin" && user.rol !== "superadmin") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center p-6">
         <div className="p-4 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-rose-500">

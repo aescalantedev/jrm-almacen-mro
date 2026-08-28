@@ -1,0 +1,32 @@
+-- TABLA: unidades_medida
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('UND', 'ST', 'Unidades', 'und', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('PAR', 'PA', 'Pares', 'par', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('JGO', 'SET', 'Juegos / Sets', 'jgo', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('CJA', 'BX', 'Cajas', 'cja', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('CIEN', 'C1', 'Cientos', 'cien', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('GL', 'GL', 'Galones', 'gl', 1) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('GALON', 'GL', 'Galones', 'gal', 1) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MTR', 'M', 'Metros', 'm', 2) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('KG', 'KG', 'Kilogramos', 'kg', 2) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('PZA', 'PC', 'Piezas', 'pza', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('ROLLO', 'ROL', 'Rollos', 'rlo', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('BLS', 'BAG', 'Bolsas', 'bls', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('UNIDAD', '', 'UNIDAD', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MTS', '', 'MTS', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MT', '', 'MT', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('UNID', '', 'UNID', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MIL', '', 'MIL', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('UIN', '', 'UIN', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('LT', '', 'LT', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('PAQ', '', 'PAQ', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('RLLO', '', 'RLLO', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MT3', '', 'MT3', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MT5', '', 'MT5', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('BL', '', 'BL', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('ROLL', '', 'ROLL', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('MT2', '', 'MT2', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('M3', '', 'M3', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('KIT', '', 'KIT', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('VAR', '', 'VAR', '', 0) ON CONFLICT DO NOTHING;
+INSERT INTO unidades_medida (codigo_unidad, codigo_sap, nombre, simbolo, permite_decimales) VALUES ('M', '', 'M', '', 0) ON CONFLICT DO NOTHING;
+

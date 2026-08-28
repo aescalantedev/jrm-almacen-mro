@@ -1,71 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { generateKardexExcel, KardexExcelRow } from '@/lib/reports/kardex-excel';
 
 export async function GET(req: NextRequest) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q') || '';
     const tipo = searchParams.get('tipo') || '';
     const desde = searchParams.get('desde') || '';
     const hasta = searchParams.get('hasta') || '';
 
-    const conditions: string[] = [];
-    const params: unknown[] = [];
+    let q = supabase.from('v_movimientos_export').select('*');
 
     if (query) {
-      conditions.push(`(
-        UPPER(m.producto) LIKE UPPER(?) OR
-        UPPER(p.glosa) LIKE UPPER(?) OR
-        UPPER(m.documento_referencia) LIKE UPPER(?) OR
-        UPPER(m.solicitante) LIKE UPPER(?)
-      )`);
       const p = `%${query.trim()}%`;
-      params.push(p, p, p, p);
+      q = q.or(`producto.ilike.${p},producto_glosa.ilike.${p},documento_referencia.ilike.${p},solicitante.ilike.${p}`);
     }
 
     if (tipo) {
-      conditions.push('m.tipo = ?');
-      params.push(tipo);
+      q = q.eq('tipo', tipo);
     }
 
     if (desde) {
-      conditions.push('date(m.created_at) >= date(?)');
-      params.push(desde);
+      q = q.gte('fecha', desde);
     }
 
     if (hasta) {
-      conditions.push('date(m.created_at) <= date(?)');
-      params.push(hasta);
+      // add one day to hasta to include the whole day
+      const endDate = new Date(hasta);
+      endDate.setDate(endDate.getDate() + 1);
+      q = q.lt('fecha', endDate.toISOString().split('T')[0]);
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const { data: rowsData, error } = await q.order('fecha', { ascending: false }).order('id', { ascending: false });
+    
+    if (error) throw error;
 
-    const rows = db.prepare(`
-      SELECT 
-        m.id,
-        m.created_at,
-        m.tipo,
-        m.producto,
-        p.glosa as descripcion,
-        p.unidad_codigo as unidad,
-        m.lote,
-        m.cantidad,
-        m.stock_anterior,
-        m.stock_resultante,
-        m.motivo,
-        m.documento_referencia,
-        m.solicitante,
-        m.rack,
-        u.nombre as usuario_nombre,
-        m.comentario
-      FROM movimientos m
-      JOIN productos p ON m.producto = p.sku
-      LEFT JOIN usuarios u ON m.usuario_id = u.id
-      ${whereClause}
-      ORDER BY m.created_at DESC, m.id DESC
-    `).all(...params) as KardexExcelRow[];
+    // Map to KardexExcelRow
+    const rows: KardexExcelRow[] = (rowsData || []).map((m: any) => ({
+      id: m.id,
+      created_at: m.fecha,
+      tipo: m.tipo,
+      producto: m.producto,
+      descripcion: m.producto_glosa,
+      unidad: m.unidad || 'UND', // Add unit if needed
+      lote: m.lote,
+      cantidad: m.cantidad,
+      stock_anterior: m.stock_anterior,
+      stock_resultante: m.stock_resultante,
+      motivo: m.motivo,
+      documento_referencia: m.documento_referencia,
+      solicitante: m.solicitante,
+      rack: m.rack,
+      usuario_nombre: m.usuario_nombre,
+      comentario: m.comentario
+    }));
 
     const excelBuffer = await generateKardexExcel(rows, { tipo, desde, hasta, q: query });
     const filename = `Kardex_Movimientos_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -78,8 +68,7 @@ export async function GET(req: NextRequest) {
         'Cache-Control': 'no-store',
       },
     });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

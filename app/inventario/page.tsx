@@ -17,6 +17,7 @@ import { useCatalogo } from "./hooks/use-catalogo";
 import { ConteoTab } from "./components/conteo-tab";
 import { RegistrosTab } from "./components/registros-tab";
 import { CatalogoTab } from "./components/catalogo-tab";
+import { NewProductDialog } from "@/components/products/new-product-dialog";
 import { BottomNav } from "./components/bottom-nav";
 
 function InventarioContent() {
@@ -25,6 +26,25 @@ function InventarioContent() {
   const [activeTab, setActiveTab] = useState("conteo");
   const searchParams = useSearchParams();
   const skuParam = searchParams.get("sku");
+
+  const [newProductOpen, setNewProductOpen] = useState(false);
+  const [catalogs, setCatalogs] = useState<any>({ bodegas: [], grupos: [], unidades: [], contenedores: [], tiposAlmacenamiento: [] });
+
+  useEffect(() => {
+    if (newProductOpen && catalogs.bodegas.length === 0 && token) {
+      fetch("/api/maestros", { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(data => {
+          setCatalogs({
+             bodegas: data.bodegas || [],
+             grupos: (data.grupos || []).map((g:any) => ({ value: String(g.id), label: `${g.codigo} - ${g.nombre}` })),
+             unidades: (data.unidades || []).map((u:any) => ({ value: u.codigo_unidad, label: `${u.codigo_unidad} - ${u.nombre}` })),
+             contenedores: data.contenedores || [],
+             tiposAlmacenamiento: (data.tiposAlmacenamiento || []).map((t:any) => ({ value: String(t.id), label: `${t.codigo} - ${t.nombre}` }))
+          });
+        });
+    }
+  }, [newProductOpen, token, catalogs.bodegas.length]);
 
   const {
     registros,
@@ -133,6 +153,7 @@ function InventarioContent() {
           handleSave={handleSave}
           catalogCount={catalogItems.length}
           onGoToCatalogo={() => setActiveTab("catalogo")}
+          onNewProduct={() => setNewProductOpen(true)}
         />
       </TabsContent>
 
@@ -176,6 +197,15 @@ function InventarioContent() {
 
   return (
     <div className="w-full space-y-4">
+      <NewProductDialog
+        open={newProductOpen}
+        onOpenChange={setNewProductOpen}
+        onProductCreated={() => {
+          setNewProductOpen(false);
+          if (searchQuery) searchStock(searchQuery);
+        }}
+        catalogs={catalogs}
+      />
       {/* Vista Desktop / Tablet (> md) o no Android */}
       <div className={isAndroid ? "hidden md:block" : "block"}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

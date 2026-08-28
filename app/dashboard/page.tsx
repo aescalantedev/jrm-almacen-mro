@@ -160,7 +160,7 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
-  if (user?.rol !== 'admin') {
+  if (user?.rol !== 'admin' && user?.rol !== 'superadmin') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
         <AlertTriangle className="h-12 w-12 text-rose-500" />

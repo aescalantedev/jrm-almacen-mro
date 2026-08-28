@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const user = verifyToken(authHeader.replace('Bearer ', ''));
-    if (!user || user.rol !== 'admin') {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase.from('usuarios').select('rol').eq('id', user.id).single();
+    if (!profile || (profile.rol !== 'admin' && profile.rol !== 'superadmin')) {
       return NextResponse.json({ error: 'Acceso denegado: solo administradores pueden importar costos' }, { status: 403 });
     }
 
@@ -15,68 +19,52 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Se requiere una lista de items con SKU y costo' }, { status: 400 });
     }
 
-    const db = getDB();
     const today = new Date().toISOString().split('T')[0];
     let actualizados = 0;
-    let noEncontrados = 0;
 
-    db.transaction(() => {
-      const updateProdStmt = db.prepare(`
-        UPDATE productos 
-        SET costo_unitario_actual = ?,
-            updated_at = datetime('now', '-5 hours')
-        WHERE sku = ?
-      `);
+    for (const item of items) {
+      if (!item.sku || item.costo === undefined) continue;
 
-      const closeHistStmt = db.prepare(`
-        UPDATE producto_costos_historial
-        SET fecha_validez_hasta = ?
-        WHERE producto_sku = ? AND fecha_validez_hasta IS NULL
-      `);
+      const cleanSKU = item.sku.trim().toUpperCase();
+      const costoNum = Number(item.costo) || 0;
 
-      const insertHistStmt = db.prepare(`
-        INSERT INTO producto_costos_historial (
-          producto_sku, costo_unitario, moneda, fecha_validez_desde,
-          motivo_modificacion, documento_referencia, created_by
-        ) VALUES (?, ?, 'PEN', ?, ?, ?, ?)
-      `);
+      // Close previous
+      await supabase
+        .from('producto_costos_historial')
+        .update({ fecha_validez_hasta: today })
+        .eq('producto_sku', cleanSKU)
+        .is('fecha_validez_hasta', null);
 
-      const checkProdStmt = db.prepare('SELECT sku FROM productos WHERE sku = ?');
+      // Insert new
+      const { error: histError } = await supabase
+        .from('producto_costos_historial')
+        .insert({
+          producto_sku: cleanSKU,
+          costo_unitario: costoNum,
+          moneda: item.moneda || 'PEN',
+          fecha_validez_desde: today,
+          motivo_modificacion: motivo || 'Importación Masiva de Costos',
+          documento_referencia: documento_referencia || '',
+          created_by: user.id
+        });
 
-      for (const item of items) {
-        const sku = String(item.sku || item.producto || '').trim().toUpperCase();
-        const rawCost = item.costo || item.costo_unitario || item['C. UNIT'] || item['C. UNIT.2'];
-        const costo = typeof rawCost === 'number' ? rawCost : parseFloat(String(rawCost || '0').replace(/,/g, ''));
-
-        if (!sku || isNaN(costo) || costo < 0) continue;
-
-        const exists = checkProdStmt.get(sku);
-        if (!exists) {
-          noEncontrados++;
-          continue;
-        }
-
-        closeHistStmt.run(today, sku);
-        insertHistStmt.run(
-          sku,
-          costo,
-          today,
-          motivo || 'Importación Masiva de Costos',
-          documento_referencia || '',
-          user.id
-        );
-        updateProdStmt.run(costo, sku);
+      if (!histError) {
+        // Update product
+        await supabase
+          .from('productos')
+          .update({ costo_unitario_actual: costoNum })
+          .eq('sku', cleanSKU);
+        
         actualizados++;
       }
-    })();
+    }
 
-    return NextResponse.json({
-      success: true,
-      actualizados,
-      noEncontrados,
-      totalProcesados: items.length
+    return NextResponse.json({ 
+      success: true, 
+      message: `Se actualizaron ${actualizados} costos correctamente` 
     });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  } catch (error) {
+    console.error("Error importando costos:", error);
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }
 }

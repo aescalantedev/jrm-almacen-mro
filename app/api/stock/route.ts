@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q') || '';
     const pendingOnly = searchParams.get('pending') === 'true';
@@ -11,85 +11,60 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
 
-    const joins = `
-      LEFT JOIN grupos_articulos g ON pr.grupo_articulo_id = g.id
-      LEFT JOIN inventario i ON pr.sku = i.producto
-      LEFT JOIN (
-        SELECT producto,
-               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
-               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
-        FROM movimientos
-        GROUP BY producto
-      ) m ON pr.sku = m.producto
-    `;
-    const conditions = [];
-    const params = [];
+    let q = supabase.from('v_inventario').select('*', { count: 'exact' });
 
     if (pendingOnly) {
-      conditions.push(`(i.id IS NULL OR i.cantidad_fisica = 0 OR i.cantidad_fisica IS NULL)`);
+      q = q.or('cantidad_fisica.is.null,cantidad_fisica.eq.0');
     }
 
     if (query) {
-      conditions.push(`(UPPER(pr.sku) LIKE UPPER(?) OR UPPER(pr.glosa) LIKE UPPER(?) OR UPPER(COALESCE(g.nombre, '')) LIKE UPPER(?) OR UPPER(pr.rack) LIKE UPPER(?))`);
-      const p = `%${query.trim()}%`;
-      params.push(p, p, p, p);
+      const searchPattern = `%${query.trim()}%`;
+      q = q.or(`producto.ilike.${searchPattern},descripcion.ilike.${searchPattern},rack.ilike.${searchPattern},familia.ilike.${searchPattern}`);
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const { data: rawStock, count: total, error } = await q
+      .order('descripcion', { ascending: true })
+      .range(offset, offset + limit - 1);
 
-    const stock = db.prepare(`
-      SELECT 
-        pr.sku as producto,
-        COALESCE(i.lote, '') as lote,
-        pr.glosa,
-        pr.unidad_codigo as unidad,
-        (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock,
-        COALESCE(g.nombre, 'GENERAL') as familia,
-        pr.peso_neto as peso,
-        pr.created_at as ultimo_ingreso,
-        pr.updated_at as fecha_sync,
-        i.id as inventario_id,
-        i.cantidad_fisica,
-        i.dif,
-        i.um as inventario_um,
-        i.presentacion,
-        i.n_cajas_bultos,
-        i.largo,
-        i.ancho,
-        i.alto,
-        i.peso_total_cant_fisica,
-        i.observacion as inventario_observacion,
-        i.comentario,
-        COALESCE(NULLIF(i.rack, ''), NULLIF(pr.rack, ''), 'Sin asignar') as rack,
-        COALESCE(NULLIF(i.ubicacion_actual, ''), pr.posicion_detalle, '') as ubicacion_actual,
-        COALESCE(NULLIF(i.almacenamiento, ''), pr.almacenamiento_codigo, 'C.C.01') as almacenamiento,
-        COALESCE(NULLIF(i.contenedor, ''), '1') as contenedor,
-        i.responsable,
-        i.fecha_conteo,
-        i.familia2,
-        COALESCE(i.foto_path, pr.foto_url) as foto_path,
-        i.usuario_id,
-        i.updated_at as inventario_updated_at,
-        (CASE WHEN (i.cantidad_fisica IS NOT NULL AND i.cantidad_fisica != 0) OR i.usuario_id IS NOT NULL OR (i.comentario IS NOT NULL AND i.comentario != '') THEN 1 ELSE 0 END) as ya_contado,
-        COALESCE(m.total_ingresos, 0) as total_ingresos,
-        COALESCE(m.total_salidas, 0) as total_salidas,
-        (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_disponible
-      FROM productos pr
-      ${joins}
-      ${whereClause}
-      ORDER BY pr.glosa LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
+    if (error) throw error;
 
-    const countRow = db.prepare(`
-      SELECT COUNT(DISTINCT pr.sku) as total 
-      FROM productos pr
-      ${joins}
-      ${whereClause}
-    `).get(...params) as { total: number };
+    // Map to frontend expected format
+    const stock = (rawStock || []).map((i: any) => ({
+      producto: i.producto,
+      lote: i.lote || '',
+      glosa: i.descripcion,
+      unidad: i.unidad,
+      stock: i.stock_sistema,
+      familia: i.familia,
+      peso: i.peso_aprox_unitario,
+      inventario_id: i.id,
+      cantidad_fisica: i.cantidad_fisica,
+      dif: i.dif,
+      inventario_um: i.um,
+      presentacion: i.presentacion,
+      n_cajas_bultos: i.n_cajas_bultos,
+      largo: i.largo,
+      ancho: i.ancho,
+      alto: i.alto,
+      peso_total_cant_fisica: i.peso_total_cant_fisica,
+      inventario_observacion: i.observacion,
+      comentario: i.comentario,
+      rack: i.rack || 'Sin asignar',
+      ubicacion_actual: i.ubicacion_actual,
+      almacenamiento: i.almacenamiento || 'C.C.01',
+      contenedor: i.contenedor || '1',
+      responsable: i.responsable,
+      fecha_conteo: i.fecha_conteo,
+      familia2: i.familia2 || i.familia,
+      foto_path: i.foto_path,
+      usuario_id: i.usuario_id,
+      inventario_updated_at: i.updated_at,
+      ya_contado: (i.cantidad_fisica !== null && i.cantidad_fisica !== 0) || i.usuario_id || (i.comentario) ? 1 : 0,
+      stock_disponible: i.stock_sistema,
+    }));
 
-    const total = countRow.total;
-    return NextResponse.json({ stock, total, page, limit });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return NextResponse.json({ stock, total: total || 0, page, limit });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

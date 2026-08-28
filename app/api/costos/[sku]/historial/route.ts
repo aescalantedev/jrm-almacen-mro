@@ -1,41 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ sku: string }> }) {
+export async function GET(req: NextRequest, context: { params: Promise<{ sku: string }> }) {
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const user = verifyToken(authHeader.replace('Bearer ', ''));
-    if (!user || user.rol !== 'admin') {
+    const { sku } = await context.params;
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase.from('usuarios').select('rol').eq('id', user.id).single();
+    if (!profile || (profile.rol !== 'admin' && profile.rol !== 'superadmin')) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
-    const { sku } = await params;
-    const cleanSKU = decodeURIComponent(sku).trim().toUpperCase();
+    const { data: history, error } = await supabase
+      .from('producto_costos_historial')
+      .select('*, usuarios!producto_costos_historial_created_by_fkey(nombre)')
+      .eq('producto_sku', sku)
+      .order('id', { ascending: false });
 
-    const db = getDB();
-    const product = db.prepare(`
-      SELECT pr.sku, pr.glosa, pr.unidad_codigo as unidad, pr.costo_unitario_actual, pr.moneda,
-             COALESCE(g.nombre, 'GENERAL') as familia
-      FROM productos pr
-      LEFT JOIN grupos_articulos g ON pr.grupo_articulo_id = g.id
-      WHERE pr.sku = ?
-    `).get(cleanSKU) as Record<string, unknown> | undefined;
+    if (error) throw error;
 
-    if (!product) {
-      return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 });
-    }
+    const formattedHistory = history.map((h: any) => ({
+      ...h,
+      usuario_nombre: h.usuarios?.nombre || 'Desconocido'
+    }));
 
-    const historial = db.prepare(`
-      SELECT h.*, u.nombre as usuario_nombre
-      FROM producto_costos_historial h
-      LEFT JOIN usuarios u ON h.created_by = u.id
-      WHERE h.producto_sku = ?
-      ORDER BY h.id DESC
-    `).all(cleanSKU);
-
-    return NextResponse.json({ product, historial });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return NextResponse.json({ history: formattedHistory });
+  } catch (error) {
+    return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }
 }

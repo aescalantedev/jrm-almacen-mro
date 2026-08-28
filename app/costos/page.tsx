@@ -81,7 +81,7 @@ const PAGE_SIZE = 50;
 
 export default function CostosPage() {
   const { user, token, logout } = useAuth();
-  const isAdmin = user?.rol === "admin";
+  const isAdmin = user?.rol === "admin" || user?.rol === "superadmin";
 
   // Data State
   const [items, setItems] = React.useState<ProductoCosto[]>([]);
@@ -311,7 +311,7 @@ export default function CostosPage() {
   };
 
   // Restrict to admin
-  if (user && user.rol !== "admin") {
+  if (user && user.rol !== "admin" && user.rol !== "superadmin") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center p-6">
         <div className="p-4 rounded-3xl bg-rose-500/10 border border-rose-500/20 text-rose-500">

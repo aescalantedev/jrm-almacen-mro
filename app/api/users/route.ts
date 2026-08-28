@@ -1,70 +1,86 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB } from '@/lib/db';
-import { verifyToken } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const user = verifyToken(authHeader.replace('Bearer ', ''));
-    if (!user || (user.rol !== 'admin' && user.rol !== 'auditor')) {
+    const supabase = await createClient();
+    
+    // Verificar permisos
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    
+    const { data: profile } = await supabase.from('usuarios').select('rol').eq('id', user.id).single();
+    if (!profile || (profile.rol !== 'admin' && profile.rol !== 'auditor' && profile.rol !== 'superadmin')) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const db = getDB();
-    const rows = db.prepare(`
-      SELECT id, nombre, usuario, rol, activo, created_at 
-      FROM usuarios
-      ORDER BY id DESC
-    `).all();
+    // Obtener usuarios
+    const { data: users, error } = await supabase
+      .from('usuarios')
+      .select('id, nombre, rol, activo')
+      .order('nombre', { ascending: false });
 
-    return NextResponse.json({ users: rows });
+    if (error) throw error;
+
+    return NextResponse.json({ users: users || [] });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }
 }
 
 export async function PUT(req: NextRequest) {
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const user = verifyToken(authHeader.replace('Bearer ', ''));
-    if (!user || user.rol !== 'admin') {
+    const supabase = await createClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const { id, nombre, usuario, rol, activo } = await req.json();
+    const { data: profile } = await supabase.from('usuarios').select('rol').eq('id', user.id).single();
+    if (!profile || (profile.rol !== 'admin' && profile.rol !== 'superadmin')) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { id, nombre, rol, activo } = await req.json();
     if (!id) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
     }
 
-    const db = getDB();
-    const stmt = db.prepare(`
-      UPDATE usuarios 
-      SET nombre = COALESCE(?, nombre),
-          usuario = COALESCE(?, usuario),
-          rol = COALESCE(?, rol),
-          activo = COALESCE(?, activo)
-      WHERE id = ?
-    `);
-    stmt.run(
-      nombre ?? null, 
-      usuario ?? null, 
-      rol ?? null, 
-      activo !== undefined ? (activo ? 1 : 0) : null, 
-      id
-    );
+    const updates: any = {};
+    if (nombre !== undefined) updates.nombre = nombre;
+    if (rol !== undefined) updates.rol = rol;
+    if (activo !== undefined) updates.activo = activo ? 1 : 0;
+    
+
+    const { error } = await supabase
+      .from('usuarios')
+      .update(updates)
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  // Trigger rebuild
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const user = verifyToken(authHeader.replace('Bearer ', ''));
-    if (!user || user.rol !== 'admin') {
+    const supabase = await createClient();
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase.from('usuarios').select('rol').eq('id', user.id).single();
+    if (!profile || (profile.rol !== 'admin' && profile.rol !== 'superadmin')) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
@@ -75,15 +91,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
     }
 
-    const db = getDB();
-    try {
-      db.prepare(`DELETE FROM usuarios WHERE id = ?`).run(id);
-    } catch (e: any) {
-      db.prepare(`UPDATE usuarios SET activo = 0 WHERE id = ?`).run(id);
-    }
+    // Solo desactivar, no borrar físicamente para evitar problemas de Foreign Keys en Supabase
+    const { error } = await supabase
+      .from('usuarios')
+      .update({ activo: 0 })
+      .eq('id', id);
+
+    if (error) throw error;
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }
 }

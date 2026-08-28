@@ -81,7 +81,7 @@ export default function UserListPage() {
 
   if (!user) return null;
 
-  if (user.rol !== 'admin') {
+  if (user.rol !== 'admin' && user.rol !== 'superadmin') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
         <AlertTriangle className="h-12 w-12 text-rose-500" />
@@ -240,7 +240,8 @@ export default function UserListPage() {
                       <Select value={u.rol} onValueChange={(val) => updateUserField(u.id, { rol: val })}>
                         <SelectTrigger className={cn(
                           "h-7 rounded-lg px-2.5 text-[10px] font-bold uppercase tracking-wider border-none shadow-none",
-                          u.rol === "admin" && "bg-primary/10 text-primary",
+                          u.rol === "superadmin" && "bg-purple-500/10 text-purple-600",
+                            u.rol === "admin" && "bg-primary/10 text-primary",
                           u.rol === "auditor" && "bg-blue-500/10 text-blue-600",
                           u.rol === "almacenero" && "bg-emerald-500/10 text-emerald-600",
                           u.rol === "contador" && "bg-slate-500/10 text-slate-600 dark:text-slate-400"
@@ -248,7 +249,8 @@ export default function UserListPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl z-[100]">
-                          <SelectItem value="admin" className="text-xs font-bold">Admin</SelectItem>
+                          <SelectItem value="superadmin" className="text-xs font-bold">Super Admin</SelectItem>
+                              <SelectItem value="admin" className="text-xs font-bold">Admin</SelectItem>
                           <SelectItem value="auditor" className="text-xs font-bold">Auditor</SelectItem>
                           <SelectItem value="almacenero" className="text-xs font-bold">Almacenero</SelectItem>
                           <SelectItem value="contador" className="text-xs font-bold">Contador</SelectItem>
@@ -332,7 +334,8 @@ export default function UserListPage() {
                           <Select value={u.rol} onValueChange={(val) => updateUserField(u.id, { rol: val })}>
                             <SelectTrigger className={cn(
                               "h-7 rounded-lg px-2.5 text-[10px] font-bold uppercase tracking-wider border-none shadow-none focus:ring-0 w-32",
-                              u.rol === "admin" && "bg-primary/10 text-primary",
+                              u.rol === "superadmin" && "bg-purple-500/10 text-purple-600",
+                            u.rol === "admin" && "bg-primary/10 text-primary",
                               u.rol === "auditor" && "bg-blue-500/10 text-blue-600",
                               u.rol === "almacenero" && "bg-emerald-500/10 text-emerald-600",
                               u.rol === "contador" && "bg-slate-500/10 text-slate-600 dark:text-slate-400"
@@ -340,6 +343,7 @@ export default function UserListPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl z-[100]">
+                              <SelectItem value="superadmin" className="text-xs font-bold">Super Admin</SelectItem>
                               <SelectItem value="admin" className="text-xs font-bold">Admin</SelectItem>
                               <SelectItem value="auditor" className="text-xs font-bold">Auditor</SelectItem>
                               <SelectItem value="almacenero" className="text-xs font-bold">Almacenero</SelectItem>
@@ -363,7 +367,7 @@ export default function UserListPage() {
                           </div>
                         </TableCell>
                         <TableCell className="px-3 font-mono text-[11px] text-muted-foreground">
-                          {new Date(u.created_at).toLocaleDateString()}
+                          {new Date((u.created_at || new Date().toISOString())).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-center px-4">
                           <Button 

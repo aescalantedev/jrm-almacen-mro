@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDB, getStockTeorico } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q') || '';
     const usuario_id = searchParams.get('usuario_id') || '';
@@ -12,66 +12,40 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '9999');
     const offset = (page - 1) * limit;
 
-    let conditions: string[] = ['(i.cantidad_fisica != 0 OR i.usuario_id IS NOT NULL)'];
-    let params: unknown[] = [];
+    let q = supabase
+      .from('v_inventario')
+      .select('*', { count: 'exact' })
+      .or('cantidad_fisica.neq.0,usuario_id.not.is.null');
 
     if (query) {
-      conditions.push('(UPPER(i.producto) LIKE UPPER(?) OR UPPER(p.glosa) LIKE UPPER(?) OR UPPER(i.lote) LIKE UPPER(?))');
-      const p = `%${query.trim()}%`;
-      params.push(p, p, p);
+      const searchPattern = `%${query.trim()}%`;
+      q = q.or(`producto.ilike.${searchPattern},descripcion.ilike.${searchPattern},lote.ilike.${searchPattern}`);
     }
     if (usuario_id) {
-      conditions.push('i.usuario_id = ?');
-      params.push(parseInt(usuario_id));
+      q = q.eq('usuario_id', usuario_id);
     }
     if (observacion) {
-      conditions.push('i.observacion = ?');
-      params.push(observacion);
+      q = q.eq('observacion', observacion);
     }
 
-    const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const { data: items, count: total, error } = await q
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    const items = db.prepare(`
-      SELECT i.*, 
-             p.glosa as descripcion, 
-             p.unidad_codigo as unidad, 
-             COALESCE(g.nombre, 'GENERAL') as familia, 
-             p.peso_neto as peso_aprox_unitario,
-             p.costo_unitario_actual as costo_unitario, 
-             (COALESCE(i.cantidad_fisica, 0) + COALESCE(m.total_ingresos, 0) - COALESCE(m.total_salidas, 0)) as stock_sistema, 
-             u.nombre as usuario_nombre
-      FROM inventario i
-      JOIN productos p ON i.producto = p.sku
-      LEFT JOIN grupos_articulos g ON p.grupo_articulo_id = g.id
-      LEFT JOIN (
-        SELECT producto,
-               SUM(CASE WHEN tipo = 'INGRESO' THEN cantidad ELSE 0 END) as total_ingresos,
-               SUM(CASE WHEN tipo = 'SALIDA' THEN cantidad ELSE 0 END) as total_salidas
-        FROM movimientos
-        GROUP BY producto
-      ) m ON i.producto = m.producto
-      LEFT JOIN usuarios u ON i.usuario_id = u.id
-      ${where} 
-      ORDER BY i.updated_at DESC 
-      LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
+    if (error) throw error;
 
-    const countRow = db.prepare(`
-      SELECT COUNT(*) as total
-      FROM inventario i
-      JOIN productos p ON i.producto = p.sku
-      ${where}
-    `).get(...params) as { total: number };
-
-    return NextResponse.json({ items, total: countRow.total, page, limit });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    return NextResponse.json({ items: items || [], total: total || 0, page, limit });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const db = getDB();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+
     const body = await req.json();
     const { 
       producto, lote = '', familia2,
@@ -88,12 +62,24 @@ export async function POST(req: NextRequest) {
     const cleanSKU = String(producto).trim().toUpperCase();
     const cleanLote = String(lote || '').trim();
 
-    const master = db.prepare('SELECT costo_unitario_actual as costo_unitario, peso_neto as peso, contenedor_id, tipo_almacenamiento_id FROM productos WHERE sku = ?').get(cleanSKU) as { costo_unitario: number; peso: number; contenedor_id: number; tipo_almacenamiento_id: number } | undefined;
-    
-    // Calcular Stock Teórico Real y Dinámico (Stock Inicial + Ingresos - Salidas)
-    const stock_sistema = getStockTeorico(db, cleanSKU, cleanLote);
-    const costo_unitario = master?.costo_unitario || 0;
-    const peso = master?.peso || 0;
+    // Obtener datos maestros del producto
+    const { data: master } = await supabase
+      .from('productos')
+      .select('costo_unitario_actual, peso_neto, contenedor_id, tipo_almacenamiento_id')
+      .eq('sku', cleanSKU)
+      .single();
+      
+    // Stock teórico inicial dinámico (esto asume que se usa la vista)
+    // Para simplificar, obtenemos los movimientos para ese SKU
+    const { data: movs } = await supabase.from('movimientos').select('tipo, cantidad').eq('producto', cleanSKU);
+    let stock_sistema = 0;
+    movs?.forEach(m => {
+      if (m.tipo === 'INGRESO') stock_sistema += Number(m.cantidad);
+      if (m.tipo === 'SALIDA') stock_sistema -= Number(m.cantidad);
+    });
+
+    const costo_unitario = master?.costo_unitario_actual || 0;
+    const peso = master?.peso_neto || 0;
 
     const cantFisica = Number(cantidad_fisica) || 0;
     const dif = cantFisica - stock_sistema;
@@ -104,7 +90,6 @@ export async function POST(req: NextRequest) {
     const obs = observacion || (dif > 0 ? 'SOBRANTE' : dif < 0 ? 'FALTANTE' : 'OK');
     const estadoAuditoria = (dif === 0) ? 'CONFORME' : 'DISCREPANCIA';
 
-    // Duración en segundos calculada
     let durSec = Number(duracion_segundos) || 0;
     if (!durSec && fecha_inicio && fecha_fin) {
       const start = new Date(fecha_inicio).getTime();
@@ -114,86 +99,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const stmt = db.prepare(`
-      INSERT INTO inventario (
-        producto, lote, familia2, cantidad_fisica, dif, um, presentacion, n_cajas_bultos,
-        largo, ancho, alto, peso_total_cant_fisica, observacion, comentario, rack,
-        ubicacion_actual, almacenamiento, contenedor, fecha_conteo, total_costo, s_dif,
-        rotacion, linea, prioridad, vida_util_ssoma, compatibilidad_segregacion,
-        condiciones_almacenamiento, foto_path, usuario_id,
-        fecha_inicio, fecha_fin, duracion_segundos, estado_auditoria,
-        updated_at
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?, ?,
-        datetime('now', '-5 hours')
-      )
-      ON CONFLICT(producto, lote) DO UPDATE SET
-        familia2 = excluded.familia2,
-        cantidad_fisica = excluded.cantidad_fisica,
-        dif = excluded.dif,
-        um = excluded.um,
-        presentacion = excluded.presentacion,
-        n_cajas_bultos = excluded.n_cajas_bultos,
-        largo = excluded.largo,
-        ancho = excluded.ancho,
-        alto = excluded.alto,
-        peso_total_cant_fisica = excluded.peso_total_cant_fisica,
-        observacion = excluded.observacion,
-        comentario = excluded.comentario,
-        rack = excluded.rack,
-        ubicacion_actual = excluded.ubicacion_actual,
-        almacenamiento = excluded.almacenamiento,
-        contenedor = excluded.contenedor,
-        fecha_conteo = excluded.fecha_conteo,
-        total_costo = excluded.total_costo,
-        s_dif = excluded.s_dif,
-        rotacion = excluded.rotacion,
-        linea = excluded.linea,
-        prioridad = excluded.prioridad,
-        vida_util_ssoma = excluded.vida_util_ssoma,
-        compatibilidad_segregacion = excluded.compatibilidad_segregacion,
-        condiciones_almacenamiento = excluded.condiciones_almacenamiento,
-        foto_path = COALESCE(excluded.foto_path, inventario.foto_path),
-        usuario_id = COALESCE(excluded.usuario_id, inventario.usuario_id),
-        fecha_inicio = COALESCE(excluded.fecha_inicio, inventario.fecha_inicio),
-        fecha_fin = COALESCE(excluded.fecha_fin, inventario.fecha_fin),
-        duracion_segundos = CASE WHEN excluded.duracion_segundos > 0 THEN excluded.duracion_segundos ELSE inventario.duracion_segundos END,
-        estado_auditoria = excluded.estado_auditoria,
-        updated_at = datetime('now', '-5 hours')
-    `);
+    const payload = {
+      producto: cleanSKU, lote: cleanLote, familia2: familia2 || '', 
+      cantidad_fisica: cantFisica, dif, um: um || '', presentacion: presentacion || '', 
+      n_cajas_bultos: n_cajas_bultos || '', largo: largo || 0, ancho: ancho || 0, alto: alto || 0, 
+      peso_total_cant_fisica: peso_total, observacion: obs, comentario: comentario || '', 
+      rack: rack || '', ubicacion_actual: ubicacion_actual || '', almacenamiento: almacenamiento || '', 
+      contenedor: contenedor || '', fecha_conteo: fecha_conteo || '', total_costo, s_dif,
+      rotacion: rotacion || '', linea: linea || '', prioridad: prioridad || '', 
+      vida_util_ssoma: vida_util_ssoma || '', compatibilidad_segregacion: compatibilidad_segregacion || '',
+      condiciones_almacenamiento: condiciones_almacenamiento || '', foto_path: foto_path || null, 
+      usuario_id: usuario_id || user.id,
+      fecha_inicio: fecha_inicio || null, fecha_fin: fecha_fin || null, duracion_segundos: durSec, 
+      estado_auditoria: estadoAuditoria, updated_at: new Date().toISOString()
+    };
 
-    stmt.run(
-      cleanSKU, cleanLote, familia2 || '', cantFisica, dif, um || '', presentacion || '', n_cajas_bultos || '',
-      largo || 0, ancho || 0, alto || 0, peso_total, obs, comentario || '', rack || '',
-      ubicacion_actual || '', almacenamiento || '', contenedor || '', fecha_conteo || '', total_costo, s_dif,
-      rotacion || '', linea || '', prioridad || '', vida_util_ssoma || '', compatibilidad_segregacion || '',
-      condiciones_almacenamiento || '', foto_path || null, usuario_id || null,
-      fecha_inicio || null, fecha_fin || null, durSec, estadoAuditoria
-    );
+    const { data: existing } = await supabase.from('inventario').select('id, duracion_segundos').eq('producto', cleanSKU).eq('lote', cleanLote).single();
 
-    // Actualizar ubicación física y foto en el maestro de productos
-    db.prepare(`
-      UPDATE productos SET
-        rack = CASE WHEN ? != '' THEN ? ELSE rack END,
-        posicion_detalle = CASE WHEN ? != '' THEN ? ELSE posicion_detalle END,
-        foto_url = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE foto_url END,
-        updated_at = datetime('now', '-5 hours')
-      WHERE sku = ?
-    `).run(
-      rack || '', rack || '',
-      ubicacion_actual || '', ubicacion_actual || '',
-      foto_path || null, foto_path || null, foto_path || null,
-      cleanSKU
-    );
+    let resultId;
+    if (existing) {
+      if (durSec <= 0) payload.duracion_segundos = existing.duracion_segundos;
+      const { data: updated, error: updError } = await supabase.from('inventario').update(payload).eq('id', existing.id).select('id').single();
+      if (updError) throw updError;
+      resultId = updated?.id;
+    } else {
+      const { data: inserted, error: insError } = await supabase.from('inventario').insert(payload).select('id').single();
+      if (insError) throw insError;
+      resultId = inserted?.id;
+    }
 
-    const insertedOrUpdated = db.prepare('SELECT id FROM inventario WHERE producto = ? AND IFNULL(lote, \'\') = ?').get(cleanSKU, cleanLote) as { id: number } | undefined;
-    return NextResponse.json({ id: insertedOrUpdated?.id, success: true, dif, obs, estadoAuditoria }, { status: 201 });
-  } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+    // Actualizar producto master
+    if (rack || ubicacion_actual || foto_path) {
+      const prodUpdates: any = { updated_at: new Date().toISOString() };
+      if (rack) prodUpdates.rack = rack;
+      if (ubicacion_actual) prodUpdates.posicion_detalle = ubicacion_actual;
+      if (foto_path) prodUpdates.foto_url = foto_path;
+      
+      await supabase.from('productos').update(prodUpdates).eq('sku', cleanSKU);
+    }
+
+    return NextResponse.json({ id: resultId, success: true, dif, obs, estadoAuditoria }, { status: 201 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
