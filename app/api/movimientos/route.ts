@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
 
     const { data: items, count: total, error } = await q
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (error) throw error;

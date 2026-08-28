@@ -9,20 +9,39 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
 
-    // Fetch all inventory data that the user has access to via RLS
-    // In a massive scale app, this should be an RPC, but for thousands of rows, JS is extremely fast.
-    const { data: invData, error } = await supabase
-      .from('inventario')
-      .select(`
-        id, producto, dif, cantidad_fisica, observacion, familia2,
-        productos (
-          glosa, costo_unitario_actual,
-          grupos_articulos (nombre)
-        )
-      `);
+    // Fetch ALL inventory data bypassing 1000 row limit
+    let allInventario: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let fetchMore = true;
 
-    if (error) throw error;
-    const inventario = invData || [];
+    while (fetchMore) {
+      const { data, error } = await supabase
+        .from('inventario')
+        .select(`
+          id, producto, dif, cantidad_fisica, observacion, familia2,
+          productos (
+            glosa, costo_unitario_actual,
+            grupos_articulos (nombre)
+          )
+        `)
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        allInventario = [...allInventario, ...data];
+        if (data.length < pageSize) {
+          fetchMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        fetchMore = false;
+      }
+    }
+
+    const inventario = allInventario;
 
     // KPI Counters
     let auditados = 0;

@@ -23,12 +23,21 @@ export async function GET(req: NextRequest, context: { params: Promise<{ sku: st
 
     if (error) throw error;
 
+    const { data: product } = await supabase
+      .from('productos')
+      .select('sku, glosa')
+      .eq('sku', sku)
+      .single();
+
     const formattedHistory = history.map((h: any) => ({
       ...h,
       usuario_nombre: h.usuarios?.nombre || 'Desconocido'
     }));
 
-    return NextResponse.json({ history: formattedHistory });
+    return NextResponse.json({ 
+      historial: formattedHistory,
+      product: product || { sku, glosa: 'Producto no encontrado' }
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }

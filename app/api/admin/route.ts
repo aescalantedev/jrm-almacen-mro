@@ -5,13 +5,33 @@ export async function GET() {
   try {
     const supabase = await createClient();
 
-    // Fetch all inventory data for aggregation (fast for <10k rows)
-    const { data: inv, error } = await supabase
-      .from('v_inventario')
-      .select('id, producto, cantidad_fisica, observacion, dif, s_dif, rack, ubicacion_actual, familia, costo_unitario, descripcion, usuario_nombre, updated_at, duracion_segundos');
+    // Fetch ALL inventory data for aggregation bypassing 1000 row limit
+    let allInventario: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let fetchMore = true;
 
-    if (error) throw error;
-    const inventario = inv || [];
+    while (fetchMore) {
+      const { data, error } = await supabase
+        .from('v_inventario')
+        .select('id, producto, cantidad_fisica, observacion, dif, s_dif, rack, ubicacion_actual, familia, costo_unitario, descripcion, usuario_nombre, updated_at, duracion_segundos')
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        allInventario = [...allInventario, ...data];
+        if (data.length < pageSize) {
+          fetchMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        fetchMore = false;
+      }
+    }
+
+    const inventario = allInventario;
 
     const { count: totalProductos } = await supabase.from('productos').select('*', { count: 'exact', head: true }).eq('is_deleted', 0);
 
@@ -117,7 +137,7 @@ export async function GET() {
         totalValorSistema: 0,
         totalDiferenciaValor: Math.round(totalDiferenciaValor * 100) / 100,
         stockTotal: totalProductos || 0,
-        porcentajeCompletado: totalRegistros > 0 ? Math.round((totalAuditados / totalRegistros) * 100) : 0,
+        porcentajeCompletado: totalProductos && totalProductos > 0 ? Math.round((totalAuditados / totalProductos) * 100) : 0,
       },
       porFamilia,
       porEstado,

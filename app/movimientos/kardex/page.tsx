@@ -86,7 +86,12 @@ export default function KardexPage() {
       const data = await res.json();
       if (res.ok) {
         if (append) {
-          setMovimientos((prev) => [...prev, ...(data.movimientos || [])]);
+          setMovimientos((prev) => {
+            const newItems = data.movimientos || [];
+            const existingIds = new Set(prev.map(m => m.id));
+            const uniqueNew = newItems.filter((m: any) => !existingIds.has(m.id));
+            return [...prev, ...uniqueNew];
+          });
         } else {
           setMovimientos(data.movimientos || []);
         }

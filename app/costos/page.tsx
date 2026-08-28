@@ -93,6 +93,7 @@ export default function CostosPage() {
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedFamilia, setSelectedFamilia] = React.useState("");
+  const [filterStatus, setFilterStatus] = React.useState("ALL"); // ALL, CON_COSTO, SIN_COSTO
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
 
@@ -108,6 +109,10 @@ export default function CostosPage() {
   const [historyData, setHistoryData] = React.useState<HistorialItem[]>([]);
   const [historyProduct, setHistoryProduct] = React.useState<any>(null);
   const [loadingHistory, setLoadingHistory] = React.useState(false);
+
+  // Delete State
+  const [deletingSKU, setDeletingSKU] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   // Import Modal State
   const [isImportOpen, setIsImportOpen] = React.useState(false);
@@ -127,6 +132,7 @@ export default function CostosPage() {
         limit: PAGE_SIZE.toString(),
         q: searchTerm,
         familia: selectedFamilia,
+        status: filterStatus,
       });
 
       const res = await fetch(`/api/costos?${params.toString()}`, {
@@ -155,12 +161,12 @@ export default function CostosPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [token, searchTerm, selectedFamilia]);
+  }, [token, searchTerm, selectedFamilia, filterStatus]);
 
   React.useEffect(() => {
     setPage(1);
     fetchData(1, false);
-  }, [fetchData]);
+  }, [fetchData, filterStatus]);
 
   const handleLoadMore = () => {
     const nextPage = page + 1;
@@ -189,14 +195,14 @@ export default function CostosPage() {
     setSavingCosto(true);
     try {
       const res = await fetch("/api/costos", {
-        method: "POST",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           sku: editingItem.sku,
-          nuevo_costo: costNum,
+          costo: costNum,
           motivo,
           documento_referencia: docRef,
         }),
@@ -235,6 +241,35 @@ export default function CostosPage() {
       toast.error("Error al cargar historial");
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  // Handle Delete Costo
+  const handleDeleteCosto = async () => {
+    if (!deletingSKU || !token) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/costos", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sku: deletingSKU }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Error al eliminar costo");
+      }
+
+      toast.success(`Costo de ${deletingSKU} eliminado correctamente`);
+      setDeletingSKU(null);
+      fetchData(1, false);
+    } catch (err: any) {
+      toast.error(err.message || "Error al eliminar costo");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -389,12 +424,12 @@ export default function CostosPage() {
         </div>
       )}
 
-      {/* Search & Filter Toolbar */}
-      <Card className="border-border/60 shadow-sm">
-        <CardContent className="p-3">
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      {/* Search & Filter Toolbar (STICKY) */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md py-3 -mx-3 px-3 sm:-mx-6 sm:px-6 border-b border-border/40 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por código SKU o descripción..."
                 value={searchTerm}
@@ -402,11 +437,20 @@ export default function CostosPage() {
                   setSearchTerm(e.target.value);
                   setPage(1);
                 }}
-                className="pl-8 h-9 text-xs rounded-xl bg-background"
+                className="pl-10 h-10 text-xs rounded-xl bg-card border-border/60 shadow-sm"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
-            <div className="w-full sm:w-60">
+            <div className="w-[180px] hidden sm:block">
               <Combobox
                 options={[
                   { value: "", label: "Todas las Familias" },
@@ -421,24 +465,53 @@ export default function CostosPage() {
                   setSelectedFamilia(val);
                   setPage(1);
                 }}
-                placeholder="Todas las Familias"
+                placeholder="Familia..."
                 searchPlaceholder="Buscar familia..."
-                className="h-9 font-semibold text-xs"
+                className="h-10 font-semibold text-xs rounded-xl bg-card border-border/60 shadow-sm"
                 allowCustom={false}
               />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 shrink-0">
+            <div className="flex p-1 bg-secondary/50 rounded-xl border border-border/60">
+              <Button
+                variant={filterStatus === "ALL" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus("ALL")}
+                className={`h-7 px-3 text-xs font-bold rounded-lg transition-all ${filterStatus === "ALL" ? "shadow-sm" : ""}`}
+              >
+                Todos
+              </Button>
+              <Button
+                variant={filterStatus === "CON_COSTO" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus("CON_COSTO")}
+                className={`h-7 px-3 text-xs font-bold rounded-lg transition-all ${filterStatus === "CON_COSTO" ? "bg-emerald-600 hover:bg-emerald-700 shadow-sm text-white" : "text-muted-foreground hover:text-emerald-600"}`}
+              >
+                Con Costo
+              </Button>
+              <Button
+                variant={filterStatus === "SIN_COSTO" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus("SIN_COSTO")}
+                className={`h-7 px-3 text-xs font-bold rounded-lg transition-all ${filterStatus === "SIN_COSTO" ? "bg-amber-500 hover:bg-amber-600 shadow-sm text-white" : "text-muted-foreground hover:text-amber-500"}`}
+              >
+                Sin Costo
+              </Button>
             </div>
 
             <Button
               variant="outline"
               onClick={() => setIsImportOpen(true)}
-              className="h-9 text-xs font-bold gap-1.5 rounded-xl shrink-0"
+              className="h-9 text-xs font-bold gap-1.5 rounded-xl shrink-0 shadow-sm bg-card ml-2"
             >
-              <UploadCloud className="h-3.5 w-3.5 text-primary" />
-              Importar CSV
+              <UploadCloud className="h-4 w-4 text-primary" />
+              <span className="hidden sm:inline">Importar CSV</span>
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Cost Table Standardized */}
       <Card className="border-border/60 shadow-xs overflow-hidden">
@@ -591,6 +664,17 @@ export default function CostosPage() {
                             >
                               <History className="h-3.5 w-3.5" />
                             </Button>
+                            {item.costo_unitario > 0 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeletingSKU(item.sku)}
+                                className="h-7 w-7 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 p-0 ml-1"
+                                title="Eliminar costo"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -689,6 +773,30 @@ export default function CostosPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Cost Confirmation */}
+      <Dialog open={Boolean(deletingSKU)} onOpenChange={(open) => !open && setDeletingSKU(null)}>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-black text-rose-500 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Eliminar Costo Vigente
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              ¿Estás seguro de eliminar el costo de <strong>{deletingSKU}</strong>? El producto pasará a estar "Sin Costo" y se registrará este cambio en el historial.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="pt-2 gap-2">
+            <Button variant="outline" onClick={() => setDeletingSKU(null)} className="rounded-xl text-xs">
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteCosto} disabled={deleting} className="rounded-xl text-xs font-bold gap-2">
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Sí, eliminar costo
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
