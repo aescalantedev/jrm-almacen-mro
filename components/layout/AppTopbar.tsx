@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Sun,
   Moon,
@@ -111,14 +111,26 @@ const ROUTE_CONFIG: Record<string, RouteInfo> = {
 
 export function AppTopbar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { setTheme, theme } = useTheme();
   const { user, logout } = useAuth();
 
-  const pageInfo: RouteInfo = ROUTE_CONFIG[pathname] || {
+  let pageInfo: RouteInfo = ROUTE_CONFIG[pathname] || {
     title: "MRO Inventario",
     subtitle: "ALM MRO CHILCA",
     icon: Warehouse,
   };
+
+  if (pathname === "/datos-maestros") {
+    const tab = searchParams.get("tab");
+    if (tab === "locales") pageInfo = { ...pageInfo, title: "Datos Maestros > Locales" };
+    if (tab === "bodegas") pageInfo = { ...pageInfo, title: "Datos Maestros > Bodegas" };
+    if (tab === "zonas") pageInfo = { ...pageInfo, title: "Datos Maestros > Zonas" };
+    if (tab === "contenedores") pageInfo = { ...pageInfo, title: "Datos Maestros > Estructuras" };
+    if (tab === "grupos") pageInfo = { ...pageInfo, title: "Datos Maestros > Grupos" };
+    if (tab === "unidades") pageInfo = { ...pageInfo, title: "Datos Maestros > Unidades" };
+    if (tab === "almacenamiento") pageInfo = { ...pageInfo, title: "Datos Maestros > Formatos" };
+  }
 
   const PageIcon = pageInfo.icon;
 

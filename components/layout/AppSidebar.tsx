@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight, Warehouse } from "lucide-react";
 import {
   Sidebar,
@@ -37,6 +37,7 @@ import { useAuth } from "@/app/inventario/hooks/use-auth";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { state, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const { user } = useAuth();
@@ -82,8 +83,14 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarMenu className="px-2 gap-1">
               {group.items.map((item) => {
+                const currentFullUrl = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
                 const isGroupActive = item.items
-                  ? item.items.some((sub) => sub.url === pathname)
+                  ? item.items.some((sub) => {
+                      if (sub.url.includes("?")) {
+                        return sub.url === currentFullUrl || (pathname === item.url && !searchParams.toString() && item.items?.[0].url === sub.url);
+                      }
+                      return sub.url === pathname;
+                    })
                   : pathname === item.url;
 
                 return (
@@ -122,13 +129,18 @@ export function AppSidebar() {
                               <div className="px-3 py-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-border/40 mb-1">
                                 {item.title}
                               </div>
-                              {item.items.map((subItem) => (
+                              {item.items.map((subItem) => {
+                                const isSubActive = subItem.url.includes("?") 
+                                  ? (subItem.url === currentFullUrl || (pathname === item.url && !searchParams.toString() && item.items?.[0].url === subItem.url))
+                                  : pathname === subItem.url;
+                                
+                                return (
                                 <DropdownMenuItem key={subItem.title} asChild>
                                   <Link
                                     href={subItem.url}
                                     className={cn(
                                       "flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2.5 text-xs transition-colors",
-                                      pathname === subItem.url
+                                      isSubActive
                                         ? "bg-primary/10 text-primary font-bold"
                                         : "hover:bg-accent focus:bg-accent font-medium text-muted-foreground",
                                     )}
@@ -140,7 +152,7 @@ export function AppSidebar() {
                                     <subItem.icon
                                       className={cn(
                                         "h-4 w-4",
-                                        pathname === subItem.url
+                                        isSubActive
                                           ? "text-primary"
                                           : "text-muted-foreground/50",
                                       )}
@@ -148,7 +160,7 @@ export function AppSidebar() {
                                     <span>{subItem.title}</span>
                                   </Link>
                                 </DropdownMenuItem>
-                              ))}
+                              )})}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </SidebarMenuItem>
@@ -186,7 +198,10 @@ export function AppSidebar() {
                             <CollapsibleContent>
                               <SidebarMenuSub className="ml-4 border-l border-border/30 pl-2 mt-1 gap-1">
                                 {item.items.map((subItem) => {
-                                  const isSubActive = pathname === subItem.url;
+                                  const isSubActive = subItem.url.includes("?") 
+                                    ? (subItem.url === currentFullUrl || (pathname === item.url && !searchParams.toString() && item.items?.[0].url === subItem.url))
+                                    : pathname === subItem.url;
+                                  
                                   return (
                                     <SidebarMenuSubItem key={subItem.title}>
                                       <SidebarMenuSubButton
@@ -195,6 +210,7 @@ export function AppSidebar() {
                                       >
                                         <Link
                                           href={subItem.url}
+                                          onClick={() => setOpenMobile(false)}
                                           className={cn(
                                             "flex items-center gap-3 h-9 rounded-md transition-all px-3",
                                             isSubActive
@@ -231,6 +247,7 @@ export function AppSidebar() {
                         >
                           <Link
                             href={item.url}
+                            onClick={() => setOpenMobile(false)}
                             className="flex items-center gap-3 px-3"
                           >
                             <item.icon

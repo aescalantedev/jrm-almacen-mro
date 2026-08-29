@@ -19,6 +19,7 @@ import {
   FileText,
   DollarSign,
   Package,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Combobox } from "@/components/ui/combobox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { TableLoadMore } from "@/components/ui/table-load-more";
 import { useAuth } from "@/app/inventario/hooks/use-auth";
 import { toast } from "sonner";
@@ -99,6 +101,8 @@ export default function CostosPage() {
 
   // Edit Modal State
   const [editingItem, setEditingItem] = React.useState<ProductoCosto | null>(null);
+  const [isCreating, setIsCreating] = React.useState(false);
+  const [createSKU, setCreateSKU] = React.useState("");
   const [nuevoCosto, setNuevoCosto] = React.useState("");
   const [motivo, setMotivo] = React.useState("");
   const [docRef, setDocRef] = React.useState("");
@@ -110,7 +114,8 @@ export default function CostosPage() {
   const [historyProduct, setHistoryProduct] = React.useState<any>(null);
   const [loadingHistory, setLoadingHistory] = React.useState(false);
 
-  // Delete State
+  // Delete & Selection State
+  const [selectedSkus, setSelectedSkus] = React.useState<string[]>([]);
   const [deletingSKU, setDeletingSKU] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
 
@@ -184,7 +189,11 @@ export default function CostosPage() {
 
   const handleSaveCosto = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingItem || !token) return;
+    const targetSku = isCreating ? createSKU.trim() : editingItem?.sku;
+    if (!targetSku || !token) {
+      toast.error("Debes ingresar un código SKU");
+      return;
+    }
 
     const costNum = parseFloat(nuevoCosto);
     if (isNaN(costNum) || costNum < 0) {
@@ -201,7 +210,7 @@ export default function CostosPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          sku: editingItem.sku,
+          sku: targetSku,
           costo: costNum,
           motivo,
           documento_referencia: docRef,
@@ -213,8 +222,9 @@ export default function CostosPage() {
         throw new Error(err.error || "Error al actualizar costo");
       }
 
-      toast.success(`Costo de ${editingItem.sku} actualizado a S/ ${costNum.toFixed(2)}`);
+      toast.success(`Costo de ${targetSku} guardado correctamente (S/ ${costNum.toFixed(2)})`);
       setEditingItem(null);
+      setIsCreating(false);
       fetchData();
     } catch (err: any) {
       toast.error(err.message || "Error al guardar costo");
@@ -244,8 +254,68 @@ export default function CostosPage() {
     }
   };
 
-  // Handle Delete Costo
+  // Selection Logic
+  const selectableItems = items.filter(i => i.costo_unitario > 0);
+  const isAllSelected = selectableItems.length > 0 && selectedSkus.length === selectableItems.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedSkus([]);
+    } else {
+      setSelectedSkus(selectableItems.map((i) => i.sku));
+    }
+  };
+
+  const toggleSelectSku = (sku: string) => {
+    setSelectedSkus((prev) =>
+      prev.includes(sku) ? prev.filter((s) => s !== sku) : [...prev, sku]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedSkus.length === 0 || !token) return;
+    setDeleting(true);
+    let successCount = 0;
+    
+    try {
+      // Execute deletions sequentially since the API doesn't support bulk DELETE
+      for (const sku of selectedSkus) {
+        const item = items.find(i => i.sku === sku);
+        if (!item || item.costo_unitario <= 0) {
+           // Skip items that already have no cost
+           successCount++;
+           continue; 
+        }
+
+        const res = await fetch("/api/costos", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ sku }),
+        });
+
+        if (res.ok) successCount++;
+      }
+
+      toast.success(`${successCount} costos eliminados o ya estaban en cero.`);
+      setSelectedSkus([]);
+      setDeletingSKU(null);
+      fetchData(1, false);
+    } catch (err: any) {
+      toast.error("Ocurrió un error al procesar algunos elementos.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Handle Delete Costo (Single)
   const handleDeleteCosto = async () => {
+    if (selectedSkus.length > 0) {
+      return handleBulkDelete();
+    }
+    
     if (!deletingSKU || !token) return;
     setDeleting(true);
     try {
@@ -457,7 +527,7 @@ export default function CostosPage() {
                   ...familias.map((f: any) =>
                     typeof f === "string"
                       ? { value: f, label: f }
-                      : { value: f.codigo || f.nombre || String(f.id), label: `${f.codigo ? f.codigo + " - " : ""}${f.nombre || f.codigo}` }
+                      : { value: f.nombre || f.codigo || String(f.id), label: f.nombre || f.codigo || String(f.id) }
                   ),
                 ]}
                 value={selectedFamilia}
@@ -471,10 +541,38 @@ export default function CostosPage() {
                 allowCustom={false}
               />
             </div>
+
+            <div className="flex p-1 bg-secondary/50 rounded-xl border border-border/60 shrink-0 hidden md:flex">
+              <Button
+                variant={filterStatus === "ALL" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus("ALL")}
+                className={`h-7 px-3 text-xs font-bold rounded-lg transition-all ${filterStatus === "ALL" ? "shadow-sm" : ""}`}
+              >
+                Todos
+              </Button>
+              <Button
+                variant={filterStatus === "CON_COSTO" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus("CON_COSTO")}
+                className={`h-7 px-3 text-xs font-bold rounded-lg transition-all ${filterStatus === "CON_COSTO" ? "bg-emerald-600 hover:bg-emerald-700 shadow-sm text-white" : "text-muted-foreground hover:text-emerald-600"}`}
+              >
+                Con Costo
+              </Button>
+              <Button
+                variant={filterStatus === "SIN_COSTO" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setFilterStatus("SIN_COSTO")}
+                className={`h-7 px-3 text-xs font-bold rounded-lg transition-all ${filterStatus === "SIN_COSTO" ? "bg-amber-500 hover:bg-amber-600 shadow-sm text-white" : "text-muted-foreground hover:text-amber-500"}`}
+              >
+                Sin Costo
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 shrink-0">
-            <div className="flex p-1 bg-secondary/50 rounded-xl border border-border/60">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Mobile filters (shows only on small screens) */}
+            <div className="flex p-1 bg-secondary/50 rounded-xl border border-border/60 shrink-0 md:hidden">
               <Button
                 variant={filterStatus === "ALL" ? "default" : "ghost"}
                 size="sm"
@@ -502,16 +600,54 @@ export default function CostosPage() {
             </div>
 
             <Button
-              variant="outline"
-              onClick={() => setIsImportOpen(true)}
-              className="h-9 text-xs font-bold gap-1.5 rounded-xl shrink-0 shadow-sm bg-card ml-2"
+              variant="default"
+              className="h-10 px-4 rounded-xl font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+              onClick={() => {
+                setCreateSKU("");
+                setNuevoCosto("");
+                setMotivo("");
+                setDocRef("");
+                setIsCreating(true);
+              }}
             >
-              <UploadCloud className="h-4 w-4 text-primary" />
-              <span className="hidden sm:inline">Importar CSV</span>
+              <CircleDollarSign className="h-4 w-4 mr-2 hidden sm:inline" />
+              Nuevo
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Floating Selection Toolbar */}
+      {selectedSkus.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-foreground text-background px-4 py-3 rounded-full shadow-2xl animate-in slide-in-from-bottom-5">
+          <span className="text-xs font-bold pl-2">
+            {selectedSkus.length} {selectedSkus.length === 1 ? 'seleccionado' : 'seleccionados'}
+          </span>
+          <div className="w-px h-4 bg-background/20" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedSkus([])}
+            className="text-background hover:bg-background/20 h-7 text-xs rounded-full px-3"
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleBulkDelete}
+            disabled={deleting}
+            className="bg-rose-500 hover:bg-rose-600 text-white h-7 text-xs font-bold rounded-full px-4 gap-1.5"
+          >
+            {deleting ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
+            Eliminar Costos ({selectedSkus.length})
+          </Button>
+        </div>
+      )}
 
       {/* Cost Table Standardized */}
       <Card className="border-border/60 shadow-xs overflow-hidden">
@@ -531,13 +667,24 @@ export default function CostosPage() {
             <>
               {/* VISTA MÓVIL (CARDS INTERACTIVAS) */}
               <div className="block sm:hidden divide-y divide-border/40">
-                {items.map((item) => (
-                  <div key={item.sku} className="p-3.5 space-y-2.5 hover:bg-secondary/20 transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                          {item.sku}
-                        </span>
+                {items.map((item) => {
+                  const isSelected = selectedSkus.includes(item.sku);
+                  return (
+                    <div key={item.sku} className={`p-3.5 space-y-2.5 transition-colors ${isSelected ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {item.costo_unitario > 0 ? (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectSku(item.sku)}
+                              className="h-4 w-4 rounded border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                          ) : (
+                            <div className="h-4 w-4 rounded border border-muted-foreground/20 bg-muted/50" />
+                          )}
+                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                            {item.sku}
+                          </span>
                         {item.familia && (
                           <Badge variant="outline" className="text-[10px] truncate max-w-[120px]">
                             {item.familia}
@@ -589,7 +736,8 @@ export default function CostosPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
 
               {/* VISTA DESKTOP (TABLA CORPORATIVA) */}
@@ -597,7 +745,14 @@ export default function CostosPage() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="bg-secondary/30 text-muted-foreground uppercase text-[10px] font-bold tracking-wider border-b border-border/50">
                     <tr>
-                      <th className="py-3 px-4">SKU / Material</th>
+                      <th className="py-3 px-4 w-10">
+                        <Checkbox
+                          checked={isAllSelected}
+                          onCheckedChange={toggleSelectAll}
+                          className="h-4 w-4 rounded border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                      </th>
+                      <th className="py-3 px-2">SKU / Material</th>
                       <th className="py-3 px-4">Descripción (Glosa)</th>
                       <th className="py-3 px-3">Grupo / Familia</th>
                       <th className="py-3 px-3">U.M.</th>
@@ -607,9 +762,22 @@ export default function CostosPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40 font-medium">
-                    {items.map((item) => (
-                      <tr key={item.sku} className="hover:bg-secondary/20 transition-colors">
-                        <td className="py-2.5 px-4 font-mono font-bold text-primary">
+                    {items.map((item) => {
+                      const isSelected = selectedSkus.includes(item.sku);
+                      return (
+                      <tr key={item.sku} className={`transition-colors ${isSelected ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}>
+                        <td className="py-2.5 px-4 w-10">
+                          {item.costo_unitario > 0 ? (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelectSku(item.sku)}
+                              className="h-4 w-4 rounded border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                            />
+                          ) : (
+                            <div className="h-4 w-4 rounded border border-muted-foreground/20 bg-muted/50" />
+                          )}
+                        </td>
+                        <td className="py-2.5 px-2 font-mono font-bold text-primary">
                           {item.sku}
                         </td>
                         <td className="py-2.5 px-4 font-bold text-foreground max-w-sm truncate">
@@ -664,21 +832,11 @@ export default function CostosPage() {
                             >
                               <History className="h-3.5 w-3.5" />
                             </Button>
-                            {item.costo_unitario > 0 && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setDeletingSKU(item.sku)}
-                                className="h-7 w-7 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 p-0 ml-1"
-                                title="Eliminar costo"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -697,31 +855,53 @@ export default function CostosPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Cost Dialog */}
-      <Dialog open={Boolean(editingItem)} onOpenChange={(open) => !open && setEditingItem(null)}>
+      {/* Edit/Create Cost Dialog */}
+      <Dialog open={Boolean(editingItem) || isCreating} onOpenChange={(open) => {
+        if (!open) {
+          setEditingItem(null);
+          setIsCreating(false);
+        }
+      }}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-lg font-black flex items-center gap-2">
               <CircleDollarSign className="h-5 w-5 text-primary" />
-              Actualizar Costo Unitario
+              {isCreating ? "Registrar Nuevo Costo" : "Actualizar Costo Unitario"}
             </DialogTitle>
             <DialogDescription className="text-xs">
               Al guardar, se creará un nuevo periodo de vigencia en el historial financiero.
             </DialogDescription>
           </DialogHeader>
 
-          {editingItem && (
+          {(editingItem || isCreating) && (
             <form onSubmit={handleSaveCosto} className="space-y-4 pt-2">
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border/50 space-y-1 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-primary">{editingItem.sku}</span>
-                  <span className="text-muted-foreground">{editingItem.unidad}</span>
+              {isCreating ? (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold">Código del Producto (SKU)</Label>
+                  <Input
+                    required
+                    placeholder="Ejem: REP-001"
+                    value={createSKU}
+                    onChange={(e) => setCreateSKU(e.target.value)}
+                    className="h-10 font-mono font-bold text-sm rounded-xl"
+                    autoFocus
+                  />
+                  <p className="text-[10px] text-muted-foreground ml-1">
+                    Ingresa el SKU exacto al que se le aplicará este costo.
+                  </p>
                 </div>
-                <p className="font-medium text-foreground">{editingItem.glosa}</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Costo actual: S/ {editingItem.costo_unitario.toFixed(2)}
-                </p>
-              </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-secondary/40 border border-border/50 space-y-1 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-primary">{editingItem?.sku}</span>
+                    <span className="text-muted-foreground">{editingItem?.unidad}</span>
+                  </div>
+                  <p className="font-medium text-foreground">{editingItem?.glosa}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Costo actual: S/ {editingItem?.costo_unitario?.toFixed(2)}
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold">Nuevo Costo Unitario (S/ PEN)</Label>

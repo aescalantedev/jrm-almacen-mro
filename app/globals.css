@@ -245,3 +245,8 @@
 .fixed-header-spacer {
   height: env(safe-area-inset-top, 0px);
 }
+
+/* --- RECHARTS FIXES --- */
+.recharts-wrapper *, .recharts-surface * {
+  outline: none !important;
+}

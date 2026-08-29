@@ -108,12 +108,10 @@ export async function POST(req: NextRequest) {
         throw new Error(`El producto ${item.producto} no existe en el catálogo maestro`);
       }
 
-      const { data: movs } = await supabase.from('movimientos').select('tipo, cantidad').eq('producto', item.producto);
-      let stockAnterior = 0;
-      movs?.forEach(m => {
-        if (m.tipo === 'INGRESO') stockAnterior += Number(m.cantidad);
-        if (m.tipo === 'SALIDA') stockAnterior -= Number(m.cantidad);
-      });
+      const { data: stockData, error: stockErr } = await supabase.rpc('get_stock_anterior', { p_sku: item.producto });
+      if (stockErr) throw stockErr;
+      
+      let stockAnterior = Number(stockData) || 0;
 
       if (tipo === 'SALIDA' && !permitir_negativo && item.cantidad > stockAnterior) {
         throw new Error(`Stock insuficiente para ${item.producto} (${prod.glosa}): Disponible (${stockAnterior} ${prod.unidad_codigo}), Intentando retirar (${item.cantidad})`);

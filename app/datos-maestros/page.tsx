@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Database,
   Search,
@@ -17,12 +18,15 @@ import {
   CheckCircle2,
   X,
   Building2,
+  MapPin,
+  Map
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -31,17 +35,45 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/app/inventario/hooks/use-auth";
 import { toast } from "sonner";
 
+interface Local {
+  id: number;
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  total_bodegas: number;
+}
+
 interface Bodega {
   id: number;
+  local_id?: number;
+  local_nombre?: string;
   codigo: string;
   nombre: string;
   empresa_codigo: string;
   direccion: string;
+  total_zonas: number;
   total_contenedores: number;
   total_materiales: number;
+}
+
+interface Zona {
+  id: number;
+  bodega_id?: number;
+  bodega_nombre?: string;
+  codigo: string;
+  nombre: string;
+  descripcion: string;
+  total_contenedores: number;
 }
 
 interface GrupoArticulo {
@@ -66,9 +98,11 @@ interface Contenedor {
   bodega_id?: number;
   bodega_nombre?: string;
   bodega_codigo?: string;
+  zona_id?: number;
+  zona_nombre?: string;
+  tipo_estructura?: string;
   codigo_contenedor: string;
   nombre: string;
-  zona: string;
   descripcion: string;
   total_materiales: number;
 }
@@ -81,15 +115,18 @@ interface TipoAlmacenamiento {
   total_materiales: number;
 }
 
-type TabType = "bodegas" | "grupos" | "unidades" | "contenedores" | "almacenamiento";
+type TabType = "locales" | "bodegas" | "zonas" | "contenedores" | "grupos" | "unidades" | "almacenamiento";
 
-export default function DatosMaestrosPage() {
+function DatosMaestrosPageContent() {
   const { user, token } = useAuth();
-  const [activeTab, setActiveTab] = React.useState<TabType>("bodegas");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = React.useState<TabType>("locales");
   const [loading, setLoading] = React.useState(true);
 
   // Data State
+  const [locales, setLocales] = React.useState<Local[]>([]);
   const [bodegas, setBodegas] = React.useState<Bodega[]>([]);
+  const [zonas, setZonas] = React.useState<Zona[]>([]);
   const [grupos, setGrupos] = React.useState<GrupoArticulo[]>([]);
   const [unidades, setUnidades] = React.useState<UnidadMedida[]>([]);
   const [contenedores, setContenedores] = React.useState<Contenedor[]>([]);
@@ -97,13 +134,43 @@ export default function DatosMaestrosPage() {
 
   // Search Filter
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [selectedLocalId, setSelectedLocalId] = React.useState<string>("all");
+  const [selectedBodegaId, setSelectedBodegaId] = React.useState<string>("all");
+  const [selectedZonaId, setSelectedZonaId] = React.useState<string>("all");
 
   // Modal State
   const [modalOpen, setModalOpen] = React.useState(false);
   const [modalMode, setModalMode] = React.useState<"create" | "edit">("create");
-  const [modalEntity, setModalEntity] = React.useState<TabType>("bodegas");
+  const [modalEntity, setModalEntity] = React.useState<TabType>("locales");
   const [formData, setFormData] = React.useState<Record<string, any>>({});
   const [saving, setSaving] = React.useState(false);
+
+  const handleDrillDown = (nextTab: TabType, parentKey: string, parentId: string) => {
+    setActiveTab(nextTab);
+    setSearchTerm("");
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", nextTab);
+    url.searchParams.delete("local_id");
+    url.searchParams.delete("bodega_id");
+    url.searchParams.delete("zona_id");
+    url.searchParams.set(parentKey, parentId);
+    window.history.pushState({}, "", url.toString());
+    
+    if (parentKey === "local_id") setSelectedLocalId(parentId);
+    if (parentKey === "bodega_id") setSelectedBodegaId(parentId);
+    if (parentKey === "zona_id") setSelectedZonaId(parentId);
+  };
+
+  // Handle Tab Change
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setSearchTerm("");
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      window.history.pushState({}, "", url.toString());
+    }
+  };
 
   // Fetch Master Data
   const fetchData = React.useCallback(async () => {
@@ -121,7 +188,9 @@ export default function DatosMaestrosPage() {
 
       const data = await res.json();
       if (data) {
+        setLocales(data.locales || []);
         setBodegas(data.bodegas || []);
+        setZonas(data.zonas || []);
         setGrupos(data.grupos || []);
         setUnidades(data.unidades || []);
         setContenedores(data.contenedores || []);
@@ -138,11 +207,31 @@ export default function DatosMaestrosPage() {
     fetchData();
   }, [fetchData]);
 
+  React.useEffect(() => {
+    const tabParam = searchParams.get("tab") as TabType;
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+    
+    const localId = searchParams.get("local_id");
+    if (localId) setSelectedLocalId(localId);
+    
+    const bodegaId = searchParams.get("bodega_id");
+    if (bodegaId) setSelectedBodegaId(bodegaId);
+    
+    const zonaId = searchParams.get("zona_id");
+    if (zonaId) setSelectedZonaId(zonaId);
+  }, [searchParams]);
+
   // Open Modal Helpers
   const handleOpenCreate = (entity: TabType) => {
     setModalEntity(entity);
     setModalMode("create");
-    setFormData(entity === "contenedores" ? { bodega_id: bodegas[0]?.id || 1 } : {});
+    let initialData: Record<string, any> = {};
+    if (entity === "bodegas") initialData = { local_id: locales[0]?.id || "" };
+    if (entity === "zonas") initialData = { bodega_id: bodegas[0]?.id || "" };
+    if (entity === "contenedores") initialData = { zona_id: zonas[0]?.id || "", tipo_estructura: "Rack Metálico Pesado" };
+    setFormData(initialData);
     setModalOpen(true);
   };
 
@@ -161,7 +250,9 @@ export default function DatosMaestrosPage() {
     setSaving(true);
     try {
       const entityMap: Record<TabType, string> = {
+        locales: "locales",
         bodegas: "bodegas",
+        zonas: "zonas",
         grupos: "grupos_articulos",
         unidades: "unidades_medida",
         contenedores: "contenedores",
@@ -200,7 +291,9 @@ export default function DatosMaestrosPage() {
 
     try {
       const entityMap: Record<TabType, string> = {
+        locales: "locales",
         bodegas: "bodegas",
+        zonas: "zonas",
         grupos: "grupos_articulos",
         unidades: "unidades_medida",
         contenedores: "contenedores",
@@ -240,7 +333,7 @@ export default function DatosMaestrosPage() {
         <div className="space-y-1">
           <h2 className="text-xl font-bold">Acceso Restringido</h2>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Solo administradores tienen privilegios para parametrizar datos maestros SAP.
+            Solo administradores tienen privilegios para parametrizar datos maestros.
           </p>
         </div>
       </div>
@@ -249,162 +342,138 @@ export default function DatosMaestrosPage() {
 
   // Filter Data according to Search
   const q = searchTerm.toLowerCase();
-  const filteredBodegas = bodegas.filter(
-    (b) => b.codigo.toLowerCase().includes(q) || b.nombre.toLowerCase().includes(q)
+  
+  const filteredLocales = locales.filter(
+    (l) => l.codigo.toLowerCase().includes(q) || l.nombre.toLowerCase().includes(q)
   );
+
+  const filteredBodegas = bodegas.filter((b) => {
+    const matchesQ = b.codigo.toLowerCase().includes(q) || b.nombre.toLowerCase().includes(q) || (b.local_nombre && b.local_nombre.toLowerCase().includes(q));
+    const matchesLocal = selectedLocalId === "all" || b.local_id?.toString() === selectedLocalId;
+    return matchesQ && matchesLocal;
+  });
+
+  const filteredZonas = zonas.filter((z) => {
+    const matchesQ = z.codigo.toLowerCase().includes(q) || z.nombre.toLowerCase().includes(q) || (z.bodega_nombre && z.bodega_nombre.toLowerCase().includes(q));
+    const matchesBodega = selectedBodegaId === "all" || z.bodega_id?.toString() === selectedBodegaId;
+    return matchesQ && matchesBodega;
+  });
+
+  const filteredContenedores = contenedores.filter(
+    (c) => {
+      const matchesQ = c.codigo_contenedor.toLowerCase().includes(q) ||
+        c.nombre.toLowerCase().includes(q) ||
+        (c.zona_nombre && c.zona_nombre.toLowerCase().includes(q)) ||
+        (c.bodega_nombre && c.bodega_nombre.toLowerCase().includes(q));
+      const matchesZona = selectedZonaId === "all" || c.zona_id?.toString() === selectedZonaId;
+      return matchesQ && matchesZona;
+    }
+  );
+
   const filteredGrupos = grupos.filter(
     (g) => g.codigo.toLowerCase().includes(q) || g.nombre.toLowerCase().includes(q)
   );
+  
   const filteredUnidades = unidades.filter(
     (u) =>
       u.codigo_unidad.toLowerCase().includes(q) ||
       u.nombre.toLowerCase().includes(q) ||
-      u.codigo_sap.toLowerCase().includes(q)
+u.codigo_sap.toLowerCase().includes(q)
   );
-  const filteredContenedores = contenedores.filter(
-    (c) =>
-      c.codigo_contenedor.toLowerCase().includes(q) ||
-      c.nombre.toLowerCase().includes(q) ||
-      c.zona.toLowerCase().includes(q) ||
-      (c.bodega_nombre && c.bodega_nombre.toLowerCase().includes(q))
-  );
+  
   const filteredTiposAlmacen = tiposAlmacenamiento.filter(
     (t) => t.codigo.toLowerCase().includes(q) || t.nombre.toLowerCase().includes(q)
   );
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-10">
-      {/* Navigation Tabs Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border/60 pb-3">
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("bodegas");
-              setSearchTerm("");
-            }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === "bodegas"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <Building2 className="h-4 w-4" />
-            Bodegas / Almacenes
-            <Badge variant="secondary" className="ml-1 text-[10px] font-mono h-4 px-1.5">
-              {bodegas.length}
-            </Badge>
-          </button>
+      {/* BARRA SUPERIOR STICKY (BÚSQUEDA, FILTROS Y BOTONES) */}
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md py-2.5 -mx-3 px-3 sm:-mx-6 sm:px-6 border-b border-border/40 shadow-2xs space-y-2">
+        <div className="flex items-center gap-2">
+          
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder={`Buscar en ${activeTab}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-9 h-10 text-xs sm:text-sm rounded-xl bg-card border-border/60"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
-          <button
+          <Button
             type="button"
-            onClick={() => {
-              setActiveTab("grupos");
-              setSearchTerm("");
-            }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === "grupos"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
+            onClick={() => handleOpenCreate(activeTab)}
+            className="h-10 w-10 sm:w-auto text-xs font-bold sm:gap-1.5 rounded-xl sm:px-3.5 shrink-0 shadow-xs p-0 sm:p-auto flex items-center justify-center"
           >
-            <Layers className="h-4 w-4" />
-            Grupos de Artículos
-            <Badge variant="secondary" className="ml-1 text-[10px] font-mono h-4 px-1.5">
-              {grupos.length}
-            </Badge>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("unidades");
-              setSearchTerm("");
-            }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === "unidades"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <Ruler className="h-4 w-4" />
-            Unidades de Medida
-            <Badge variant="secondary" className="ml-1 text-[10px] font-mono h-4 px-1.5">
-              {unidades.length}
-            </Badge>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("contenedores");
-              setSearchTerm("");
-            }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === "contenedores"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <Warehouse className="h-4 w-4" />
-            Contenedores & Zonas
-            <Badge variant="secondary" className="ml-1 text-[10px] font-mono h-4 px-1.5">
-              {contenedores.length}
-            </Badge>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("almacenamiento");
-              setSearchTerm("");
-            }}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === "almacenamiento"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <Boxes className="h-4 w-4" />
-            Tipos de Almacenamiento
-            <Badge variant="secondary" className="ml-1 text-[10px] font-mono h-4 px-1.5">
-              {tiposAlmacenamiento.length}
-            </Badge>
-          </button>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              {activeTab === "locales" && "Nuevo Local"}
+              {activeTab === "bodegas" && "Nueva Bodega"}
+              {activeTab === "zonas" && "Nueva Zona"}
+              {activeTab === "contenedores" && "Nueva Estructura"}
+              {activeTab === "grupos" && "Nuevo Grupo"}
+              {activeTab === "unidades" && "Nueva Unidad"}
+              {activeTab === "almacenamiento" && "Nuevo Tipo"}
+            </span>
+          </Button>
         </div>
 
-        <Button
-          size="sm"
-          onClick={() => handleOpenCreate(activeTab)}
-          className="h-9 text-xs font-bold gap-1.5 rounded-xl shadow-sm shrink-0"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {activeTab === "bodegas" && "Nueva Bodega"}
-          {activeTab === "grupos" && "Nuevo Grupo"}
-          {activeTab === "unidades" && "Nueva Unidad"}
-          {activeTab === "contenedores" && "Nuevo Contenedor/Zona"}
-          {activeTab === "almacenamiento" && "Nuevo Formato"}
-        </Button>
-      </div>
+        {/* Fila secundaria para filtros (solo se muestra si hay dropdown) */}
+        {(activeTab === "bodegas" || activeTab === "zonas" || activeTab === "contenedores") && (
+          <div className="flex items-center gap-2">
+            {activeTab === "bodegas" && (
+              <Select value={selectedLocalId} onValueChange={setSelectedLocalId}>
+                <SelectTrigger className="h-10 rounded-xl bg-card border-border/60 w-full sm:w-48 text-xs shrink-0">
+                  <SelectValue placeholder="Todos los Locales" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los Locales</SelectItem>
+                  {locales.map(l => (
+                    <SelectItem key={l.id} value={l.id.toString()}>{l.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-      {/* Search Toolbar */}
-      <div className="flex items-center gap-2 bg-card p-2.5 rounded-xl border border-border/60 max-w-md">
-        <Search className="h-4 w-4 text-muted-foreground shrink-0 ml-1" />
-        <Input
-          type="text"
-          placeholder={`Buscar en ${activeTab}...`}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="h-8 text-xs border-0 bg-transparent focus-visible:ring-0 shadow-none px-1"
-        />
-        {searchTerm && (
-          <button
-            type="button"
-            onClick={() => setSearchTerm("")}
-            className="text-muted-foreground hover:text-foreground mr-1"
-          >
-            <X className="h-4 w-4" />
-          </button>
+            {activeTab === "zonas" && (
+              <Select value={selectedBodegaId} onValueChange={setSelectedBodegaId}>
+                <SelectTrigger className="h-10 rounded-xl bg-card border-border/60 w-full sm:w-48 text-xs shrink-0">
+                  <SelectValue placeholder="Todas las Bodegas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las Bodegas</SelectItem>
+                  {bodegas.map(b => (
+                    <SelectItem key={b.id} value={b.id.toString()}>{b.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {activeTab === "contenedores" && (
+              <Select value={selectedZonaId} onValueChange={setSelectedZonaId}>
+                <SelectTrigger className="h-10 rounded-xl bg-card border-border/60 w-full sm:w-48 text-xs shrink-0">
+                  <SelectValue placeholder="Todas las Zonas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las Zonas</SelectItem>
+                  {zonas.map(z => (
+                    <SelectItem key={z.id} value={z.id.toString()}>{z.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         )}
       </div>
 
@@ -414,292 +483,712 @@ export default function DatosMaestrosPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {/* 0. BODEGAS */}
-          {activeTab === "bodegas" &&
-            filteredBodegas.map((b) => (
-              <Card key={b.id} className="border-border/60 hover:border-primary/40 transition-colors shadow-xs">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                          {b.codigo}
-                        </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          Empresa {b.empresa_codigo}
-                        </Badge>
-                      </div>
-                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{b.nombre}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => handleOpenEdit("bodegas", b)}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-rose-500"
-                        onClick={() => handleDelete("bodegas", b.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {b.direccion || "Sin dirección especificada"}
-                  </p>
-
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Warehouse className="h-3.5 w-3.5 text-primary" /> {b.total_contenedores || 0} contenedores
-                    </span>
-                    <span className="flex items-center gap-1 font-mono">
-                      <Package className="h-3.5 w-3.5 text-primary" /> {b.total_materiales || 0} repuestos
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-          {/* 1. GRUPOS DE ARTÍCULOS */}
-          {activeTab === "grupos" &&
-            filteredGrupos.map((g) => (
-              <Card key={g.id} className="border-border/60 hover:border-primary/40 transition-colors shadow-xs">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                        {g.codigo}
-                      </span>
-                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{g.nombre}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => handleOpenEdit("grupos", g)}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-rose-500"
-                        onClick={() => handleDelete("grupos", g.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {g.descripcion || "Sin descripción adicional"}
-                  </p>
-
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Materiales vinculados:</span>
-                    <span className="font-mono font-bold text-foreground flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5 text-primary" />
-                      {g.total_materiales}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-          {/* 2. UNIDADES DE MEDIDA */}
-          {activeTab === "unidades" &&
-            filteredUnidades.map((u) => (
-              <Card key={u.codigo_unidad} className="border-border/60 hover:border-primary/40 transition-colors shadow-xs">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                          {u.codigo_unidad}
-                        </span>
-                        {u.codigo_sap && (
-                          <Badge variant="outline" className="text-[10px] font-mono">
-                            SAP: {u.codigo_sap}
-                          </Badge>
-                        )}
-                      </div>
-                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{u.nombre}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => handleOpenEdit("unidades", u)}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">
-                    <div>
-                      Símbolo: <span className="font-mono font-bold text-foreground">{u.simbolo || "-"}</span>
-                    </div>
-                    <div>
-                      Decimales:{" "}
-                      <span className="font-semibold text-foreground">
-                        {u.permite_decimales ? "Permitido" : "Enteros"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Materiales activos:</span>
-                    <span className="font-mono font-bold text-foreground flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5 text-primary" />
-                      {u.total_materiales}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-          {/* 3. CONTENEDORES */}
-          {activeTab === "contenedores" &&
-            filteredContenedores.map((c) => (
-              <Card key={c.id} className="border-border/60 hover:border-primary/40 transition-colors shadow-xs">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                          {c.codigo_contenedor}
-                        </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {c.zona || "PATIO"}
-                        </Badge>
-                      </div>
-                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{c.nombre}</h3>
-                      {c.bodega_nombre && (
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <Building2 className="h-3 w-3 text-primary" /> {c.bodega_nombre}
+        <div className="w-full">
+          
+          {/* LOCALES */}
+          {activeTab === "locales" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredLocales.map((l) => (
+                  <div key={l.id} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleDrillDown("bodegas", "local_id", l.id.toString())}>
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {l.codigo}
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{l.nombre}</h3>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => handleOpenEdit("contenedores", c)}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-rose-500"
-                        onClick={() => handleDelete("contenedores", c.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.stopPropagation(); handleOpenEdit("locales", l); }}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            onClick={(e) => { e.stopPropagation(); handleDelete("locales", l.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
 
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {c.descripcion || "Sin observaciones"}
-                  </p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {l.descripcion || "Sin descripción"}
+                      </p>
 
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Repuestos almacenados:</span>
-                    <span className="font-mono font-bold text-foreground flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5 text-primary" />
-                      {c.total_materiales}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-          {/* 4. TIPOS DE ALMACENAMIENTO */}
-          {activeTab === "almacenamiento" &&
-            filteredTiposAlmacen.map((t) => (
-              <Card key={t.id} className="border-border/60 hover:border-primary/40 transition-colors shadow-xs">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-0.5">
-                      <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                        {t.codigo}
-                      </span>
-                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{t.nombre}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                        onClick={() => handleOpenEdit("almacenamiento", t)}
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-rose-500"
-                        onClick={() => handleDelete("almacenamiento", t.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Building2 className="h-3.5 w-3.5 text-primary" /> {l.total_bodegas || 0} bodegas
+                        </span>
+                      </div>
                     </div>
                   </div>
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Bodegas</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLocales.map((l) => (
+                      <TableRow key={l.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown("bodegas", "local_id", l.id.toString())}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{l.codigo}</TableCell>
+                        <TableCell className="font-medium">{l.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{l.descripcion || "Sin descripción"}</TableCell>
+                        <TableCell><Badge variant="secondary">{l.total_bodegas || 0} bodegas</Badge></TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenEdit("locales", l); }}><Edit3 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600" onClick={(e) => { e.stopPropagation(); handleDelete("locales", l.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {t.descripcion || "Formato de estiba física"}
-                  </p>
+          {/* BODEGAS */}
+          {activeTab === "bodegas" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredBodegas.map((b) => (
+                  <div key={b.id} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleDrillDown("zonas", "bodega_id", b.id.toString())}>
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {b.codigo}
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">
+                              Empresa {b.empresa_codigo}
+                            </Badge>
+                          </div>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{b.nombre}</h3>
+                          {b.local_nombre && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-primary" /> Local: {b.local_nombre}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.stopPropagation(); handleOpenEdit("bodegas", b); }}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            onClick={(e) => { e.stopPropagation(); handleDelete("bodegas", b.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
 
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Ítems con este formato:</span>
-                    <span className="font-mono font-bold text-foreground flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5 text-primary" />
-                      {t.total_materiales}
-                    </span>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {b.direccion || "Sin dirección especificada"}
+                      </p>
+
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Map className="h-3.5 w-3.5 text-primary" /> {b.total_zonas || 0} zonas
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Warehouse className="h-3.5 w-3.5 text-primary" /> {b.total_contenedores || 0} est.
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Empresa</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Local</TableHead>
+                      <TableHead>Dirección</TableHead>
+                      <TableHead>Zonas / Est.</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBodegas.map((b) => (
+                      <TableRow key={b.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown("zonas", "bodega_id", b.id.toString())}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{b.codigo}</TableCell>
+                        <TableCell><Badge variant="outline">{b.empresa_codigo}</Badge></TableCell>
+                        <TableCell className="font-medium">{b.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{b.local_nombre || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">{b.direccion || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col text-xs">
+                            <span>{b.total_zonas || 0} zonas</span>
+                            <span className="text-muted-foreground">{b.total_contenedores || 0} est.</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenEdit("bodegas", b); }}><Edit3 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600" onClick={(e) => { e.stopPropagation(); handleDelete("bodegas", b.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          {/* ZONAS */}
+          {activeTab === "zonas" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredZonas.map((z) => (
+                  <div key={z.id} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleDrillDown("contenedores", "zona_id", z.id.toString())}>
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {z.codigo}
+                            </span>
+                          </div>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{z.nombre}</h3>
+                          {z.bodega_nombre && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Building2 className="h-3 w-3 text-primary" /> {z.bodega_nombre}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.stopPropagation(); handleOpenEdit("zonas", z); }}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            onClick={(e) => { e.stopPropagation(); handleDelete("zonas", z.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {z.descripcion || "Sin descripción"}
+                      </p>
+
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Warehouse className="h-3.5 w-3.5 text-primary" /> {z.total_contenedores || 0} estructuras
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Bodega</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Estructuras</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredZonas.map((z) => (
+                      <TableRow key={z.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleDrillDown("contenedores", "zona_id", z.id.toString())}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{z.codigo}</TableCell>
+                        <TableCell className="font-medium">{z.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{z.bodega_nombre || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">{z.descripcion || "Sin descripción"}</TableCell>
+                        <TableCell><Badge variant="secondary">{z.total_contenedores || 0} estructuras</Badge></TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenEdit("zonas", z); }}><Edit3 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600" onClick={(e) => { e.stopPropagation(); handleDelete("zonas", z.id); }}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          {/* CONTENEDORES (ESTRUCTURAS) */}
+          {activeTab === "contenedores" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredContenedores.map((c) => (
+                  <div key={c.id} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {c.codigo_contenedor}
+                            </span>
+                            <Badge variant="outline" className="text-[10px]">
+                              {c.zona_nombre || "Sin Zona"}
+                            </Badge>
+                          </div>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{c.nombre}</h3>
+                          {c.tipo_estructura && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <Boxes className="h-3 w-3 text-primary" /> {c.tipo_estructura}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleOpenEdit("contenedores", c)}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            onClick={() => handleDelete("contenedores", c.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {c.descripcion || "Sin observaciones"}
+                      </p>
+
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Repuestos almacenados:</span>
+                        <span className="font-mono font-bold text-foreground flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-primary" />
+                          {c.total_materiales || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Zona</TableHead>
+                      <TableHead>Tipo Estructura</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Repuestos</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredContenedores.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{c.codigo_contenedor}</TableCell>
+                        <TableCell className="font-medium">{c.nombre}</TableCell>
+                        <TableCell><Badge variant="outline">{c.zona_nombre || "Sin Zona"}</Badge></TableCell>
+                        <TableCell className="text-muted-foreground">{c.tipo_estructura || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">{c.descripcion || "Sin observaciones"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 font-mono">
+                            <Package className="h-3.5 w-3.5 text-primary" />
+                            {c.total_materiales || 0}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleOpenEdit("contenedores", c)}><Edit3 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600" onClick={() => handleDelete("contenedores", c.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          {/* GRUPOS DE ARTÍCULOS */}
+          {activeTab === "grupos" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredGrupos.map((g) => (
+                  <div key={g.id} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                            {g.codigo}
+                          </span>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{g.nombre}</h3>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleOpenEdit("grupos", g)}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            onClick={() => handleDelete("grupos", g.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {g.descripcion || "Sin descripción adicional"}
+                      </p>
+
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Materiales vinculados:</span>
+                        <span className="font-mono font-bold text-foreground flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-primary" />
+                          {g.total_materiales}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Materiales</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredGrupos.map((g) => (
+                      <TableRow key={g.id}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{g.codigo}</TableCell>
+                        <TableCell className="font-medium">{g.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{g.descripcion || "Sin descripción"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 font-mono">
+                            <Package className="h-3.5 w-3.5 text-primary" />
+                            {g.total_materiales || 0}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleOpenEdit("grupos", g)}><Edit3 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600" onClick={() => handleDelete("grupos", g.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          {/* UNIDADES DE MEDIDA */}
+          {activeTab === "unidades" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredUnidades.map((u) => (
+                  <div key={u.codigo_unidad} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {u.codigo_unidad}
+                            </span>
+                            {u.codigo_sap && (
+                              <Badge variant="outline" className="text-[10px] font-mono">
+                                SAP: {u.codigo_sap}
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{u.nombre}</h3>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleOpenEdit("unidades", u)}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-1">
+                        <div>
+                          Símbolo: <span className="font-mono font-bold text-foreground">{u.simbolo || "-"}</span>
+                        </div>
+                        <div>
+                          Decimales:{" "}
+                          <span className="font-semibold text-foreground">
+                            {u.permite_decimales ? "Permitido" : "Enteros"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Materiales activos:</span>
+                        <span className="font-mono font-bold text-foreground flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-primary" />
+                          {u.total_materiales}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>SAP</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Símbolo</TableHead>
+                      <TableHead>Decimales</TableHead>
+                      <TableHead>Materiales</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUnidades.map((u) => (
+                      <TableRow key={u.codigo_unidad}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{u.codigo_unidad}</TableCell>
+                        <TableCell><Badge variant="outline">{u.codigo_sap || "-"}</Badge></TableCell>
+                        <TableCell className="font-medium">{u.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{u.simbolo || "-"}</TableCell>
+                        <TableCell className="text-muted-foreground">{u.permite_decimales ? "Sí" : "No"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 font-mono">
+                            <Package className="h-3.5 w-3.5 text-primary" />
+                            {u.total_materiales || 0}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleOpenEdit("unidades", u)}><Edit3 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+
+          {/* TIPOS DE ALMACENAMIENTO */}
+          {activeTab === "almacenamiento" && (
+            <>
+              <div className="md:hidden bg-card rounded-xl border border-border/60 divide-y divide-border/60 overflow-hidden">
+                {filteredTiposAlmacen.map((t) => (
+                  <div key={t.id} className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                            {t.codigo}
+                          </span>
+                          <h3 className="text-sm font-bold text-foreground line-clamp-1">{t.nombre}</h3>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleOpenEdit("almacenamiento", t)}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            onClick={() => handleDelete("almacenamiento", t.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {t.descripcion || "Formato de estiba física"}
+                      </p>
+
+                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Ítems con este formato:</span>
+                        <span className="font-mono font-bold text-foreground flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5 text-primary" />
+                          {t.total_materiales}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block rounded-xl border border-border/60 bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Ítems</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTiposAlmacen.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-mono text-xs font-bold text-primary">{t.codigo}</TableCell>
+                        <TableCell className="font-medium">{t.nombre}</TableCell>
+                        <TableCell className="text-muted-foreground">{t.descripcion || "Formato de estiba física"}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 font-mono">
+                            <Package className="h-3.5 w-3.5 text-primary" />
+                            {t.total_materiales || 0}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => handleOpenEdit("almacenamiento", t)}><Edit3 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600" onClick={() => handleDelete("almacenamiento", t.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* CRUD MODAL DIALOG */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="w-full h-[100dvh] max-w-none sm:max-w-md sm:h-auto max-h-[100dvh] sm:max-h-[85vh] rounded-none sm:rounded-xl flex flex-col p-4 sm:p-6 overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               {modalMode === "create" ? "Nuevo Registro" : "Modificar Registro"}
             </DialogTitle>
             <DialogDescription>
-              Parametrización oficial en tablas maestras SAP MM / WM.
+              Parametrización oficial en tablas maestras.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <form onSubmit={handleSubmit} className="space-y-4 py-2 flex-1 overflow-y-auto">
+            
+            {/* LOCALES FORM */}
+            {modalEntity === "locales" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Código de Local</Label>
+                  <Input
+                    value={formData.codigo || ""}
+                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                    placeholder="Ej: LOC-01"
+                    required
+                    disabled={modalMode === "edit"}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nombre del Local</Label>
+                  <Input
+                    value={formData.nombre || ""}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                    placeholder="Ej: Sede Principal"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Descripción</Label>
+                  <Input
+                    value={formData.descripcion || ""}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                    placeholder="Opcional..."
+                  />
+                </div>
+              </>
+            )}
+
             {/* BODEGAS FORM */}
             {modalEntity === "bodegas" && (
               <>
+                <div className="space-y-1.5">
+                  <Label>Local Perteneciente</Label>
+                  <Select value={formData.local_id?.toString() || ""} onValueChange={(val) => setFormData({...formData, local_id: parseInt(val, 10)})}>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs">
+                      <SelectValue placeholder="Seleccione un local" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locales.map((l) => (
+                        <SelectItem key={l.id} value={l.id.toString()}>
+                          {l.codigo} - {l.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-1.5">
                   <Label>Código Bodega / Almacén (LGORT)</Label>
                   <Input
@@ -736,6 +1225,107 @@ export default function DatosMaestrosPage() {
                       placeholder="Planta Chilca"
                     />
                   </div>
+                </div>
+              </>
+            )}
+
+            {/* ZONAS FORM */}
+            {modalEntity === "zonas" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Bodega Perteneciente</Label>
+                  <Select value={formData.bodega_id?.toString() || ""} onValueChange={(val) => setFormData({...formData, bodega_id: parseInt(val, 10)})}>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs">
+                      <SelectValue placeholder="Seleccione una bodega" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bodegas.map((b) => (
+                        <SelectItem key={b.id} value={b.id.toString()}>
+                          {b.codigo} - {b.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Código Zona</Label>
+                  <Input
+                    value={formData.codigo || ""}
+                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                    placeholder="Ej: ZON-A"
+                    required
+                    disabled={modalMode === "edit"}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nombre de la Zona</Label>
+                  <Input
+                    value={formData.nombre || ""}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                    placeholder="Ej: Nave Principal"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Descripción</Label>
+                  <Input
+                    value={formData.descripcion || ""}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                    placeholder="Opcional..."
+                  />
+                </div>
+              </>
+            )}
+
+            {/* CONTENEDORES (ESTRUCTURAS) FORM */}
+            {modalEntity === "contenedores" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Zona Perteneciente</Label>
+                  <Select value={formData.zona_id?.toString() || ""} onValueChange={(val) => setFormData({...formData, zona_id: parseInt(val, 10)})}>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs">
+                      <SelectValue placeholder="Seleccione una zona" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {zonas.map((z) => (
+                        <SelectItem key={z.id} value={z.id.toString()}>
+                          {z.codigo} - {z.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Código Estructura (LGTYP)</Label>
+                  <Input
+                    value={formData.codigo_contenedor || ""}
+                    onChange={(e) => setFormData({ ...formData, codigo_contenedor: e.target.value })}
+                    placeholder="Ej: CONT-01, EST-02, RACK-A"
+                    required
+                    disabled={modalMode === "edit"}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nombre / Descripción</Label>
+                  <Input
+                    value={formData.nombre || ""}
+                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                    placeholder="Ej: Rack Metálico Pesado A1"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tipo de Estructura</Label>
+                  <Select value={formData.tipo_estructura || "Rack Metálico Pesado"} onValueChange={(val) => setFormData({...formData, tipo_estructura: val})}>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs">
+                      <SelectValue placeholder="Tipo de Estructura" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Rack Metálico Pesado">Rack Metálico Pesado</SelectItem>
+                      <SelectItem value="Estantería Cajas">Estantería Cajas</SelectItem>
+                      <SelectItem value="Piso/Patio">Piso/Patio</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </>
             )}
@@ -816,53 +1406,6 @@ export default function DatosMaestrosPage() {
               </>
             )}
 
-            {/* CONTENEDORES FORM */}
-            {modalEntity === "contenedores" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label>Bodega / Almacén Perteneciente</Label>
-                  <select
-                    value={formData.bodega_id || 1}
-                    onChange={(e) => setFormData({ ...formData, bodega_id: parseInt(e.target.value, 10) })}
-                    className="w-full h-10 px-3 rounded-lg border border-border bg-background text-xs"
-                  >
-                    {bodegas.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.codigo} - {b.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Código Contenedor / Zona (LGTYP)</Label>
-                  <Input
-                    value={formData.codigo_contenedor || ""}
-                    onChange={(e) => setFormData({ ...formData, codigo_contenedor: e.target.value })}
-                    placeholder="Ej: CONT-01, CONT-02, C.C.01"
-                    required
-                    disabled={modalMode === "edit"}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Nombre / Descripción</Label>
-                  <Input
-                    value={formData.nombre || ""}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Ej: Contenedor 1 - EPPs"
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Zona / Patio</Label>
-                  <Input
-                    value={formData.zona || ""}
-                    onChange={(e) => setFormData({ ...formData, zona: e.target.value })}
-                    placeholder="Ej: PATIO NORTE, NAVE PRINCIPAL"
-                  />
-                </div>
-              </>
-            )}
-
             {/* TIPOS ALMACENAMIENTO FORM */}
             {modalEntity === "almacenamiento" && (
               <>
@@ -906,5 +1449,13 @@ export default function DatosMaestrosPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function DatosMaestrosPage() {
+  return (
+    <React.Suspense fallback={<div className="p-8 text-center text-muted-foreground animate-pulse">Cargando módulos...</div>}>
+      <DatosMaestrosPageContent />
+    </React.Suspense>
   );
 }

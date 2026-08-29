@@ -17,19 +17,25 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('q') || '';
     const status = searchParams.get('status') || 'ALL';
+    const familia = searchParams.get('familia') || '';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = (page - 1) * limit;
 
-    let pQuery = supabase.from('productos').select('sku, glosa, unidad_codigo, costo_unitario_actual, moneda', { count: 'exact' });
+    let pQuery = supabase.from('v_costos').select('*', { count: 'exact' });
+    
     if (query) {
       pQuery = pQuery.or(`sku.ilike.%${query}%,glosa.ilike.%${query}%`);
     }
 
+    if (familia) {
+      pQuery = pQuery.eq('familia', familia);
+    }
+
     if (status === 'CON_COSTO') {
-      pQuery = pQuery.gt('costo_unitario_actual', 0);
+      pQuery = pQuery.gt('costo_unitario', 0);
     } else if (status === 'SIN_COSTO') {
-      pQuery = pQuery.or('costo_unitario_actual.eq.0,costo_unitario_actual.is.null');
+      pQuery = pQuery.or('costo_unitario.eq.0,costo_unitario.is.null');
     }
 
     const { data: items, count, error } = await pQuery
@@ -38,13 +44,43 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    const mappedItems = items?.map(item => ({
-      ...item,
-      unidad: item.unidad_codigo,
-      costo_unitario: Number(item.costo_unitario_actual || 0)
-    })) || [];
+    // Fetch Stats
+    const { data: allCostos } = await supabase.from('v_costos').select('costo_unitario');
+    let total = 0, con_costo = 0, sin_costo = 0, sum = 0;
+    
+    if (allCostos) {
+      total = allCostos.length;
+      allCostos.forEach((c) => {
+        const cost = Number(c.costo_unitario || 0);
+        if (cost > 0) {
+          con_costo++;
+          sum += cost;
+        } else {
+          sin_costo++;
+        }
+      });
+    }
 
-    return NextResponse.json({ items: mappedItems, total: count || 0, page, totalPages: Math.ceil((count || 0) / limit) });
+    const costo_promedio = con_costo > 0 ? sum / con_costo : 0;
+    
+    const stats = {
+      total,
+      con_costo,
+      sin_costo,
+      costo_promedio
+    };
+
+    // Fetch Familias
+    const { data: familiasData } = await supabase.from('grupos_articulos').select('id, codigo, nombre').eq('is_deleted', 0).order('nombre');
+    
+    return NextResponse.json({ 
+      items: items || [], 
+      total: count || 0, 
+      page, 
+      totalPages: Math.ceil((count || 0) / limit),
+      stats,
+      familias: familiasData || []
+    });
   } catch (error) {
     return NextResponse.json({ error: 'Error del servidor' }, { status: 500 });
   }

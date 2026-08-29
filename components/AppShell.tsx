@@ -83,9 +83,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : (
         <SidebarProvider>
           <div className="flex h-[100dvh] w-full overflow-hidden">
-            <AppSidebar />
+            <React.Suspense fallback={<div className="w-64 h-full bg-sidebar border-r border-border/50 animate-pulse" />}>
+              <AppSidebar />
+            </React.Suspense>
             <SidebarInset className="flex flex-col bg-secondary/10 dark:bg-secondary/5 h-[100dvh] w-full overflow-hidden">
-              <AppTopbar />
+              <React.Suspense fallback={<div className="h-16 w-full border-b border-border/40 bg-background/80" />}>
+                <AppTopbar />
+              </React.Suspense>
               <div className="flex-1 flex flex-col w-full overflow-y-auto">
                 <main className="flex-1 p-3 sm:p-5 lg:p-6 w-full min-w-0 max-w-full">
                   {children}

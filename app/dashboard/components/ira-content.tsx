@@ -21,6 +21,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface IRAKPIs {
   iraSKU: number;
@@ -67,6 +75,24 @@ interface CausaRaiz {
 }
 
 const COLORS = ["#10B981", "#F43F5E", "#F59E0B", "#94A3B8"];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover text-popover-foreground border border-border/50 shadow-md rounded-xl p-3 flex flex-col gap-1 z-50">
+        <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+          {label || payload[0].payload.name || payload[0].name}
+        </span>
+        {payload.map((entry: any, index: number) => (
+          <span key={index} className="font-black font-mono text-sm" style={{ color: entry.color }}>
+            {entry.name}: {entry.value.toLocaleString()}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 function KPICard({
   label,
@@ -165,17 +191,6 @@ export function IRAContent() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div>
-        <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
-          <Target className="h-5 w-5 text-primary" />
-          IRA — Exactitud de Inventario
-        </h2>
-        <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-          Indice de Registro de Inventario — Periodo Actual
-        </p>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <KPICard
@@ -269,15 +284,7 @@ export function IRAContent() {
                     height={40}
                   />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "0.75rem",
-                      fontSize: "11px",
-                      color: "hsl(var(--popover-foreground))",
-                    }}
-                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
                   <Legend wrapperStyle={{ fontSize: "10px" }} />
                   <Bar dataKey="conformes" name="Conformes" fill="#10B981" radius={[3, 3, 0, 0]} />
                   <Bar dataKey="con_error" name="Con Error" fill="#F43F5E" radius={[3, 3, 0, 0]} />
@@ -316,15 +323,7 @@ export function IRAContent() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "0.75rem",
-                      fontSize: "11px",
-                      color: "hsl(var(--popover-foreground))",
-                    }}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: "10px" }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -358,45 +357,45 @@ export function IRAContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-secondary/40 border-b border-border/40">
-                <tr>
-                  <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">SKU</th>
-                  <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">Descripcion</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Sis.</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Fis.</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">DIF</th>
-                  <th className="text-right py-2.5 px-3 font-bold text-muted-foreground uppercase">Impacto ($)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30">
-                {topImpacto.map((item) => (
-                  <tr key={item.producto} className="hover:bg-secondary/20 transition">
-                    <td className="py-2 px-3 font-mono font-bold">{item.producto}</td>
-                    <td className="py-2 px-3 max-w-[200px] truncate font-medium" title={item.descripcion}>
+          <div className="overflow-x-auto rounded-xl border border-border/50 m-3">
+            <Table>
+              <TableHeader className="bg-secondary/30">
+                <TableRow className="hover:bg-transparent border-border/50">
+                  <TableHead className="font-black text-[10px] uppercase tracking-widest text-primary">SKU</TableHead>
+                  <TableHead className="font-black text-[10px] uppercase tracking-widest">Descripcion</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Sis.</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Fis.</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">DIF</TableHead>
+                  <TableHead className="text-right font-black text-[10px] uppercase tracking-widest">Impacto ($)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {topImpacto.map((item, i) => (
+                  <TableRow key={item.producto} className={`h-12 border-border/30 hover:bg-muted/50 ${i % 2 === 1 ? 'bg-secondary/10' : ''}`}>
+                    <TableCell className="font-black text-xs">{item.producto}</TableCell>
+                    <TableCell className="max-w-[200px] truncate text-xs font-medium" title={item.descripcion}>
                       {item.descripcion}
-                    </td>
-                    <td className="py-2 px-2 text-center font-mono">{item.stock_sistema}</td>
-                    <td className="py-2 px-2 text-center font-mono font-bold text-primary">{item.cantidad_fisica}</td>
-                    <td className="py-2 px-2 text-center">
-                      <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[11px] ${
+                    </TableCell>
+                    <TableCell className="text-center text-xs font-mono">{item.stock_sistema}</TableCell>
+                    <TableCell className="text-center text-xs font-mono font-bold text-primary">{item.cantidad_fisica}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={`font-mono font-black text-[10px] border-none shadow-none ${
                         item.dif > 0
                           ? "bg-amber-500/10 text-amber-600"
                           : "bg-rose-500/10 text-rose-600"
                       }`}>
                         {item.dif > 0 ? `+${item.dif}` : item.dif}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono font-bold">
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right text-xs font-mono font-black">
                       <span className={item.impacto_monetario >= 0 ? "text-amber-600" : "text-rose-600"}>
                         {item.impacto_monetario >= 0 ? "+" : ""}S/ {item.impacto_monetario.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -410,51 +409,51 @@ export function IRAContent() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-secondary/40 border-b border-border/40">
-                <tr>
-                  <th className="text-left py-2.5 px-3 font-bold text-muted-foreground uppercase">Clase</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Total</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Conformes</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Con Error</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">Pendientes</th>
-                  <th className="text-center py-2.5 px-2 font-bold text-muted-foreground uppercase">IRA %</th>
-                  <th className="text-center py-2.5 px-3 font-bold text-muted-foreground uppercase">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30">
-                {porFamilia.filter((f) => f.total > 0).map((f) => {
+          <div className="overflow-x-auto rounded-xl border border-border/50 m-3">
+            <Table>
+              <TableHeader className="bg-secondary/30">
+                <TableRow className="hover:bg-transparent border-border/50">
+                  <TableHead className="font-black text-[10px] uppercase tracking-widest text-primary">Clase</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Total</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Conformes</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Con Error</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Pendientes</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">IRA %</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase tracking-widest">Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {porFamilia.filter((f) => f.total > 0).map((f, i) => {
                   const auditados = f.total - f.pendientes;
                   const ira = auditados > 0 ? Math.round((f.conformes / auditados) * 1000) / 10 : 0;
                   const status = ira >= 95 ? "OK" : ira >= 90 ? "Revisar" : "Critico";
                   return (
-                    <tr key={f.familia} className="hover:bg-secondary/20 transition">
-                      <td className="py-2 px-3 font-bold">{f.familia}</td>
-                      <td className="py-2 px-2 text-center font-mono">{f.total}</td>
-                      <td className="py-2 px-2 text-center font-mono text-emerald-600">{f.conformes}</td>
-                      <td className="py-2 px-2 text-center font-mono text-rose-600">{f.con_error}</td>
-                      <td className="py-2 px-2 text-center font-mono text-muted-foreground">{f.pendientes}</td>
-                      <td className="py-2 px-2 text-center font-mono font-bold">{ira}%</td>
-                      <td className="py-2 px-3 text-center">
+                    <TableRow key={f.familia} className={`h-12 border-border/30 hover:bg-muted/50 ${i % 2 === 1 ? 'bg-secondary/10' : ''}`}>
+                      <TableCell className="font-black text-xs">{f.familia}</TableCell>
+                      <TableCell className="text-center text-xs font-mono">{f.total}</TableCell>
+                      <TableCell className="text-center text-xs font-mono text-emerald-600">{f.conformes}</TableCell>
+                      <TableCell className="text-center text-xs font-mono text-rose-600">{f.con_error}</TableCell>
+                      <TableCell className="text-center text-xs font-mono text-muted-foreground">{f.pendientes}</TableCell>
+                      <TableCell className="text-center text-xs font-mono font-black">{ira}%</TableCell>
+                      <TableCell className="text-center">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] ${
+                          className={`text-[10px] uppercase tracking-wider font-black shadow-none border-none ${
                             status === "OK"
-                              ? "border-emerald-500/40 text-emerald-600"
+                              ? "bg-emerald-500/10 text-emerald-600"
                               : status === "Revisar"
-                                ? "border-amber-500/40 text-amber-600"
-                                : "border-rose-500/40 text-rose-600"
+                                ? "bg-amber-500/10 text-amber-600"
+                                : "bg-rose-500/10 text-rose-600"
                           }`}
                         >
                           {status}
                         </Badge>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>

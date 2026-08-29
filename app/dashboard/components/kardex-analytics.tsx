@@ -32,6 +32,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover text-popover-foreground border border-border/50 shadow-md rounded-xl p-3 flex flex-col gap-1 z-50">
+        <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+          {label || payload[0].payload.name || payload[0].name}
+        </span>
+        {payload.map((entry: any, index: number) => (
+          <span key={index} className="font-black font-mono text-sm" style={{ color: entry.color }}>
+            {entry.name === 'ingresos' ? 'Ingresos (+)' : entry.name === 'salidas' ? 'Salidas (-)' : entry.name}: {entry.value.toLocaleString()}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 interface TendenciaItem {
   fecha: string;
   ingresos: number;
@@ -205,7 +223,7 @@ export function KardexAnalytics({ token }: { token: string }) {
                     <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                     <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: "#0F172A", color: "#FFF", borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent', stroke: 'transparent'}} />
                     <Legend />
                     <Area type="monotone" dataKey="ingresos" name="Ingresos (+)" stroke="#10B981" fillOpacity={1} fill="url(#colorIngresos)" strokeWidth={2} />
                     <Area type="monotone" dataKey="salidas" name="Salidas (-)" stroke="#F43F5E" fillOpacity={1} fill="url(#colorSalidas)" strokeWidth={2} />
@@ -249,7 +267,7 @@ export function KardexAnalytics({ token }: { token: string }) {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: "#0F172A", color: "#FFF", borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent', stroke: 'transparent'}} />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -288,10 +306,7 @@ export function KardexAnalytics({ token }: { token: string }) {
                     <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                     <XAxis type="number" tick={{ fontSize: 11 }} />
                     <YAxis dataKey="producto" type="category" tick={{ fontSize: 10, fontFamily: "monospace" }} width={80} />
-                    <Tooltip
-                      formatter={(val, name, item) => [`${val} ${item.payload.unidad || "UND"} (${item.payload.glosa})`, "Despachado"]}
-                      contentStyle={{ backgroundColor: "#0F172A", color: "#FFF", borderRadius: 8, fontSize: 12 }}
-                    />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
                     <Bar dataKey="total_despachado" fill="#F43F5E" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

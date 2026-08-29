@@ -9,7 +9,9 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
 
     const results = await Promise.all([
+      supabase.from('v_maestro_locales').select('*').order('codigo', { ascending: true }),
       supabase.from('v_maestro_bodegas').select('*').order('codigo', { ascending: true }),
+      supabase.from('v_maestro_zonas').select('*').order('codigo', { ascending: true }),
       supabase.from('v_maestro_grupos').select('*').order('nombre', { ascending: true }),
       supabase.from('v_maestro_unidades').select('*').order('codigo_unidad', { ascending: true }),
       supabase.from('v_maestro_contenedores').select('*').order('codigo_contenedor', { ascending: true }),
@@ -21,7 +23,9 @@ export async function GET(req: NextRequest) {
     }
 
     const [
+      { data: locales },
       { data: bodegas },
+      { data: zonas },
       { data: grupos },
       { data: unidades },
       { data: contenedores },
@@ -29,7 +33,9 @@ export async function GET(req: NextRequest) {
     ] = results;
 
     return NextResponse.json({
+      locales: locales || [],
       bodegas: bodegas || [],
+      zonas: zonas || [],
       grupos: grupos || [],
       unidades: unidades || [],
       contenedores: contenedores || [],

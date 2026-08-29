@@ -20,6 +20,24 @@ import { IRAContent } from "./components/ira-content";
 import { KardexAnalytics } from "./components/kardex-analytics";
 import { useAuth } from "../inventario/hooks/use-auth";
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-popover text-popover-foreground border border-border/50 shadow-md rounded-xl p-3 flex flex-col gap-1 z-50">
+        <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+          {label || payload[0].payload.name || payload[0].name}
+        </span>
+        {payload.map((entry: any, index: number) => (
+          <span key={index} className="font-black font-mono text-sm" style={{ color: entry.color }}>
+            {entry.name === 'cant_fisica' ? 'Cant. Física' : entry.name === 'stock_sistema' ? 'Stock Sistema' : entry.name}: {entry.value.toLocaleString()} {entry.name === 'cant_fisica' || entry.name === 'stock_sistema' ? 'und' : ''}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 interface DashboardStats {
   totalRegistros: number;
   totalAuditados: number;
@@ -434,19 +452,7 @@ export default function DashboardPage() {
                     height={45}
                   />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "0.75rem",
-                      fontSize: "11px",
-                      color: "hsl(var(--popover-foreground))",
-                    }}
-                    formatter={(value: any, name: any) => [
-                      `${Number(value).toLocaleString()} und`,
-                      name === "cant_fisica" ? "Cant. Física" : "Stock Sistema",
-                    ]}
-                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
                   <Legend
                     wrapperStyle={{ fontSize: "11px", paddingTop: "10px" }}
                     formatter={(val) => (val === "cant_fisica" ? "Físico Contado" : "Stock Sistema")}
@@ -487,15 +493,7 @@ export default function DashboardPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      borderColor: "hsl(var(--border))",
-                      borderRadius: "0.75rem",
-                      fontSize: "11px",
-                      color: "hsl(var(--popover-foreground))",
-                    }}
-                  />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend
                     wrapperStyle={{ fontSize: "11px" }}
                     layout="horizontal"
